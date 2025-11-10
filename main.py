@@ -21,8 +21,36 @@ app = FastAPI(title="MINORE BARBERSHOP")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Create tables
+# Create tables and ensure initial data
 models.Base.metadata.create_all(bind=models.engine)
+
+# Ensure initial data exists
+try:
+    from sqlalchemy.orm import sessionmaker
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=models.engine)
+    db = SessionLocal()
+    
+    # Check if we have any barbers, if not, add default ones
+    if not crud.get_barbers(db):
+        default_barbers = ["Luca", "Michele", "Raffaele", "Abel", "Wendy", "Sergio"]
+        for barber_name in default_barbers:
+            crud.create_barber(db, barber_name)
+    
+    # Check if we have any services, if not, add default ones
+    if not crud.get_services(db):
+        default_services = [
+            ("Classic Haircut", "Traditional scissor cut with styling", 30, 25.00),
+            ("Beard Trim", "Professional beard shaping and trimming", 20, 15.00),
+            ("Hair + Beard", "Complete grooming package", 45, 35.00),
+            ("Shampoo & Style", "Hair wash and professional styling", 25, 20.00),
+            ("Buzz Cut", "Short clipper cut all around", 15, 18.00)
+        ]
+        for service_name, description, duration, price in default_services:
+            crud.create_service(db, service_name, duration, price, description)
+    
+    db.close()
+except Exception as e:
+    print(f"Initial data setup error: {e}")
 
 # Scheduler for automatic cleanup
 scheduler = AsyncIOScheduler()
@@ -50,6 +78,7 @@ scheduler.add_job(
 async def startup_event():
     scheduler.start()
     print("Scheduler started - Auto cleanup at 22:00 daily")
+    print("MINORE BARBERSHOP - Ready for appointments!")
 
 @app.on_event("shutdown")
 async def shutdown_event():
