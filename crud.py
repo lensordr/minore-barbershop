@@ -98,11 +98,18 @@ def get_today_appointment_counts(db: Session):
     return {"total": total, "completed": completed, "cancelled": cancelled}
 
 def get_available_times(db: Session, barber_id: int):
-    today = datetime.now().date()
+    now = datetime.now()
+    today = now.date()
     schedule = get_schedule(db)
     
     start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
     end_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.end_hour))
+    
+    # Don't allow booking times that have already passed
+    if start_time < now:
+        start_time = now.replace(minute=0 if now.minute < 30 else 30, second=0, microsecond=0)
+        if now.minute >= 30:
+            start_time = start_time.replace(hour=start_time.hour + 1, minute=0)
     
     # Get existing appointments for this barber today (exclude cancelled)
     existing = db.query(models.Appointment).filter(
@@ -116,15 +123,16 @@ def get_available_times(db: Session, barber_id: int):
     available_times = []
     current = start_time
     while current < end_time:
-        # Check if this time slot is available
-        is_available = True
-        for appointment in existing:
-            if appointment.appointment_time == current:
-                is_available = False
-                break
-        
-        if is_available:
-            available_times.append(current.strftime("%H:%M"))
+        # Check if this time slot is available and not in the past
+        if current > now:
+            is_available = True
+            for appointment in existing:
+                if appointment.appointment_time == current:
+                    is_available = False
+                    break
+            
+            if is_available:
+                available_times.append(current.strftime("%H:%M"))
         
         current += timedelta(minutes=30)
     
