@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Revenue - MINORE BARBERSHOP{% endblock %}
+
+{% block header %}
+<nav class="admin-nav">
+    <a href="/admin/dashboard">Dashboard</a>
+    <a href="/admin/staff">Staff</a>
+    <a href="/admin/revenue" class="active">Revenue</a>
+    <a href="/admin/logout" class="logout-btn">Logout</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="revenue-report">
+    <div class="revenue-header">
+        <h2>Revenue Reports</h2>
+        <div class="view-filters">
+            <a href="/admin/revenue?view=daily" class="filter-btn active">Daily</a>
+            <a href="/admin/revenue?view=weekly" class="filter-btn">Weekly</a>
+            <a href="/admin/revenue?view=monthly" class="filter-btn">Monthly</a>
+        </div>
+    </div>
+    
+    <div class="date-filter">
+        <form method="GET" action="/admin/revenue">
+            <input type="hidden" name="view" value="daily">
+            <label for="date">Select Date:</label>
+            <input type="date" name="date" value="{{ selected_date }}" onchange="this.form.submit()">
+        </form>
+    </div>
+    
+    <h3>Revenue for {{ revenue_data.date }}</h3>
+    
+    <div class="revenue-table">
+        <div class="table-header">
+            <div>Barber</div>
+            <div>Revenue</div>
+            <div>Appointments</div>
+            <div>Avg per Appointment</div>
+        </div>
+        
+        {% for record in revenue_data.records %}
+        <div class="table-row">
+            <div class="barber-name">{{ record.barber.name }}</div>
+            <div class="revenue-amount">€{{ "%.2f"|format(record.revenue) }}</div>
+            <div class="appointment-count">{{ record.appointments_count }}</div>
+            <div class="avg-amount">€{{ "%.2f"|format(record.revenue / record.appointments_count if record.appointments_count > 0 else 0) }}</div>
+        </div>
+        {% endfor %}
+        
+        {% if revenue_data.records %}
+        <div class="table-total">
+            <div><strong>TOTAL</strong></div>
+            <div class="total-revenue"><strong>€{{ "%.2f"|format(revenue_data.total_revenue) }}</strong></div>
+            <div><strong>{{ revenue_data.total_appointments }}</strong></div>
+            <div><strong>€{{ "%.2f"|format(revenue_data.total_revenue / revenue_data.total_appointments if revenue_data.total_appointments > 0 else 0) }}</strong></div>
+        </div>
+        {% else %}
+        <div class="no-data">No revenue data for this date.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

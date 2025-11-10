@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="hero">
+    <h2>Welcome to MINORE BARBERSHOP</h2>
+    <p>Book your appointment today</p>
+    <a href="/book" class="btn btn-primary">Book Appointment</a>
+</div>
+
+<div class="qr-section">
+    <h3>Scan QR Code to Book</h3>
+    <div class="qr-code">
+        <img src="/static/qr_code.png" alt="QR Code" class="qr-image" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+        <div class="qr-placeholder" style="display: none;">QR CODE</div>
+        <p>Point your camera at this QR code</p>
+        <p><small>Or visit: <strong>localhost:8000/book</strong></small></p>
+    </div>
+</div>
+{% endblock %}

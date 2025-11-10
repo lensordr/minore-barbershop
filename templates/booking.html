@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Book Appointment - MINORE BARBERSHOP{% endblock %}
+
+{% block content %}
+<div class="booking-form">
+    <h2>Book Your Appointment</h2>
+    
+    {% if error %}
+    <div class="error-message">{{ error }}</div>
+    {% endif %}
+    
+    <form method="POST" action="/book" id="bookingForm">
+        <div class="form-group">
+            <label for="client_name">Your Name</label>
+            <input type="text" id="client_name" name="client_name" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="phone">Phone Number</label>
+            <input type="tel" id="phone" name="phone" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="service_id">Service</label>
+            <select id="service_id" name="service_id" required>
+                <option value="">Select a service</option>
+                {% for service in services %}
+                <option value="{{ service.id }}" data-price="{{ service.price }}" data-duration="{{ service.duration }}">
+                    {{ service.name }} - €{{ service.price }} ({{ service.duration }}min)
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="barber_id">Barber</label>
+            <select id="barber_id" name="barber_id" required>
+                <option value="">Select a barber</option>
+                {% for barber in barbers %}
+                <option value="{{ barber.id }}">{{ barber.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label for="appointment_time">Available Times</label>
+            <select id="appointment_time" name="appointment_time" required disabled>
+                <option value="">Select barber first</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Book Appointment</button>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('barber_id').addEventListener('change', function() {
+    const barberId = this.value;
+    const timeSelect = document.getElementById('appointment_time');
+    
+    if (barberId) {
+        fetch(`/api/available-times/${barberId}`)
+            .then(response => response.json())
+            .then(times => {
+                timeSelect.innerHTML = '<option value="">Select a time</option>';
+                times.forEach(time => {
+                    const today = new Date().toISOString().split('T')[0];
+                    const datetime = `${today}T${time}:00`;
+                    timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
+                });
+                timeSelect.disabled = false;
+            });
+    } else {
+        timeSelect.innerHTML = '<option value="">Select barber first</option>';
+        timeSelect.disabled = true;
+    }
+});
+</script>
+{% endblock %}

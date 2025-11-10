@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MINORE BARBERSHOP{% endblock %}
+
+{% block header %}
+<nav class="admin-nav">
+    <a href="/admin/dashboard" class="active">Dashboard</a>
+    <a href="/admin/staff">Staff</a>
+    <a href="/admin/revenue">Revenue</a>
+    <a href="/admin/logout" class="logout-btn">Logout</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <div class="quick-add">
+        <h3>Add Walk-in</h3>
+        <form method="POST" action="/admin/add-appointment" class="walkin-form">
+            <input type="text" name="client_name" placeholder="Client name" required>
+            <input type="tel" name="phone" placeholder="Phone" required>
+            <select name="service_id" required>
+                <option value="">Service</option>
+                {% for service in services %}
+                <option value="{{ service.id }}">{{ service.name }} - €{{ service.price }}</option>
+                {% endfor %}
+            </select>
+            <select name="barber_id" id="walkinBarber" required>
+                <option value="">Barber</option>
+                {% for barber in barbers %}
+                <option value="{{ barber.id }}">{{ barber.name }}</option>
+                {% endfor %}
+            </select>
+            <select name="appointment_time" id="walkinTime" required disabled>
+                <option value="">Select barber first</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+    </div>
+    
+    <script>
+    document.getElementById('walkinBarber').addEventListener('change', function() {
+        const barberId = this.value;
+        const timeSelect = document.getElementById('walkinTime');
+        
+        if (barberId) {
+            fetch(`/api/available-times/${barberId}`)
+                .then(response => response.json())
+                .then(times => {
+                    timeSelect.innerHTML = '<option value="">Select time</option>';
+                    times.forEach(time => {
+                        const today = new Date().toISOString().split('T')[0];
+                        const datetime = `${today}T${time}:00`;
+                        timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
+                    });
+                    timeSelect.disabled = false;
+                });
+        } else {
+            timeSelect.innerHTML = '<option value="">Select barber first</option>';
+            timeSelect.disabled = true;
+        }
+    });
+    </script>
+    
+    <div class="appointment-stats">
+        <h2>Today's Appointments</h2>
+        <div class="stats-row">
+            <span class="stat">Total: {{ counts.total }}</span>
+            <span class="stat completed">Completed: {{ counts.completed }}</span>
+            <span class="stat cancelled">Cancelled: {{ counts.cancelled }}</span>
+        </div>
+    </div>
+    
+    <div class="schedule-grid">
+        <!-- Header with barber names -->
+        <div class="grid-header">
+            <div class="time-header">Time</div>
+            {% for barber in all_barbers %}
+            <div class="barber-header{% if not barber.active %} inactive{% endif %}">{{ barber.name }}{% if not barber.active %} (Closed){% endif %}</div>
+            {% endfor %}
+        </div>
+        
+        <!-- Time rows with appointments -->
+        {% set hours = [] %}
+        {% for h in range(schedule.start_hour, schedule.end_hour) %}
+            {% set _ = hours.append('%02d:00'|format(h)) %}
+            {% set _ = hours.append('%02d:30'|format(h)) %}
+        {% endfor %}
+        {% for hour in hours %}
+        <div class="grid-row">
+            <div class="time-cell">{{ hour }}</div>
+            {% for barber in all_barbers %}
+            <div class="appointment-cell{% if not barber.active %} inactive-cell{% endif %}">
+                {% set found = false %}
+                {% for appointment in appointments %}
+                    {% if appointment.appointment_time.strftime('%H:%M') == hour and appointment.barber_id == barber.id %}
+                        {% set found = true %}
+                        <div class="appointment-item">
+                            <div class="client-name">{{ appointment.client_name }}</div>
+                            <div class="service-name">{{ appointment.service.name }}</div>
+                            <div class="appointment-actions">
+                                {% if appointment.status == "scheduled" %}
+                                <form method="POST" action="/admin/checkout/{{ appointment.id }}" style="display: inline;">
+                                    <button type="submit" class="btn-mini btn-complete">✓</button>
+                                </form>
+                                <form method="POST" action="/admin/cancel/{{ appointment.id }}" style="display: inline;">
+                                    <button type="submit" class="btn-mini btn-cancel" onclick="return confirm('Cancel?')">✗</button>
+                                </form>
+                                {% else %}
+                                <span class="status-mini {{ appointment.status }}">
+                                    {% if appointment.status == "completed" %}✓{% else %}✗{% endif %}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+                {% if not found %}
+                    <div class="empty-slot">{% if barber.active %}-{% else %}Closed{% endif %}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not appointments %}
+    <div class="no-appointments">
+        <p>No appointments scheduled for today.</p>
+    </div>
+    {% endif %}
+    
+    <div class="revenue-summary">
+        <h3>Today's Revenue by Barber</h3>
+        <div class="revenue-grid">
+            {% for barber in barbers %}
+            <div class="revenue-card">
+                <h4>{{ barber.name }}</h4>
+                <div class="revenue-amount">€{{ "%.2f"|format(barber.today_revenue) }}</div>
+                <div class="appointments-count">{{ barber.today_appointments }} completed / {{ barber.total_today_appointments }} total</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

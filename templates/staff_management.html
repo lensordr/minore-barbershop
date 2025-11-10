@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Staff Management - MINORE BARBERSHOP{% endblock %}
+
+{% block header %}
+<nav class="admin-nav">
+    <a href="/admin/dashboard">Dashboard</a>
+    <a href="/admin/staff" class="active">Staff</a>
+    <a href="/admin/revenue">Revenue</a>
+    <a href="/admin/logout" class="logout-btn">Logout</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="staff-management">
+    <div class="section">
+        <h2>Schedule Settings</h2>
+        <form method="POST" action="/admin/update-schedule" class="schedule-form">
+            <div class="schedule-row">
+                <label>Opening Hour:</label>
+                <select name="start_hour">
+                    {% for h in range(8, 13) %}
+                    <option value="{{ h }}" {% if h == schedule.start_hour %}selected{% endif %}>{{ '%02d:00'|format(h) }}</option>
+                    {% endfor %}
+                </select>
+                
+                <label>Closing Hour:</label>
+                <select name="end_hour">
+                    {% for h in range(17, 23) %}
+                    <option value="{{ h }}" {% if h == schedule.end_hour %}selected{% endif %}>{{ '%02d:00'|format(h) }}</option>
+                    {% endfor %}
+                </select>
+                
+                <button type="submit" class="btn btn-primary">Update Schedule</button>
+            </div>
+        </form>
+        <p><small>Current: {{ '%02d:00'|format(schedule.start_hour) }} - {{ '%02d:00'|format(schedule.end_hour) }} (Monday-Saturday)</small></p>
+    </div>
+    
+    <div class="section">
+        <h2>Add New Barber</h2>
+        <form method="POST" action="/admin/add-barber" class="inline-form">
+            <input type="text" name="name" placeholder="Barber name" required>
+            <button type="submit" class="btn btn-primary">Add Barber</button>
+        </form>
+    </div>
+    
+    <div class="section">
+        <h2>Current Staff</h2>
+        <div class="staff-list">
+            {% for barber in barbers %}
+            <div class="staff-item{% if not barber.active %} inactive-staff{% endif %}">
+                <div class="staff-info">
+                    <h3>{{ barber.name }}</h3>
+                    <p>{% if barber.name == 'Luca' %}Founder{% else %}Barbero{% endif %} - {% if barber.active %}Active{% else %}Closed{% endif %}</p>
+                </div>
+                <div class="staff-actions">
+                    <form method="POST" action="/admin/toggle-barber/{{ barber.id }}" style="display: inline;">
+                        <button type="submit" class="btn-toggle">{% if barber.active %}Close{% else %}Open{% endif %}</button>
+                    </form>
+                    {% if barber.name != 'Luca' %}
+                    <form method="POST" action="/admin/delete-barber/{{ barber.id }}" style="display: inline;">
+                        <button type="submit" class="btn-delete" onclick="return confirm('Delete barber?')">Delete</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <div class="section">
+        <h2>Add New Service</h2>
+        <form method="POST" action="/admin/add-service" class="service-form">
+            <div class="form-row">
+                <input type="text" name="name" placeholder="Service name" required>
+                <input type="text" name="description" placeholder="Description" required>
+                <input type="number" name="duration" placeholder="Duration (min)" required>
+                <input type="number" name="price" step="0.01" placeholder="Price" required>
+                <button type="submit" class="btn btn-primary">Add Service</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="section">
+        <h2>Services</h2>
+        <div class="services-list">
+            {% for service in services %}
+            <div class="service-item">
+                <div class="service-info">
+                    <h3>{{ service.name }}</h3>
+                    <p>{{ service.description or "No description" }}</p>
+                    <span class="service-details">{{ service.duration }}min - €{{ service.price }}</span>
+                </div>
+                <div class="service-actions">
+                    <button onclick="editService({{ service.id }}, '{{ service.name|replace("'", "\\'")|safe }}', '{{ (service.description or "")|replace("'", "\\'")|safe }}', {{ service.duration }}, {{ service.price }})" class="btn-edit">Edit</button>
+                    <form method="POST" action="/admin/delete-service/{{ service.id }}" style="display: inline;">
+                        <button type="submit" class="btn-delete" onclick="return confirm('Delete service?')">Delete</button>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Edit Service Modal -->
+    <div id="editModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Edit Service</h3>
+            <form id="editForm" method="POST">
+                <input type="text" id="editName" name="name" placeholder="Service name" required>
+                <input type="text" id="editDescription" name="description" placeholder="Description" required>
+                <input type="number" id="editDuration" name="duration" placeholder="Duration (min)" required>
+                <input type="number" id="editPrice" name="price" step="0.01" placeholder="Price" required>
+                <div class="modal-actions">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function editService(id, name, description, duration, price) {
+    document.getElementById('editName').value = name || '';
+    document.getElementById('editDescription').value = description || '';
+    document.getElementById('editDuration').value = duration;
+    document.getElementById('editPrice').value = price;
+    document.getElementById('editForm').action = '/admin/edit-service/' + id;
+    document.getElementById('editModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('editModal').style.display = 'none';
+}
+</script>
+{% endblock %}
