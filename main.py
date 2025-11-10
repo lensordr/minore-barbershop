@@ -252,7 +252,16 @@ async def admin_logout():
 
 @app.get("/api/available-times/{barber_id}")
 async def get_available_times(barber_id: int, db: Session = Depends(get_db)):
-    return crud.get_available_times(db, barber_id)
+    from fastapi.responses import JSONResponse
+    times = crud.get_available_times(db, barber_id)
+    return JSONResponse(
+        content=times,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
 
 if __name__ == "__main__":
     import os
