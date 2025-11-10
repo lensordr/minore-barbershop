@@ -117,8 +117,8 @@ def get_available_times(db: Session, barber_id: int):
     available_times = []
     current = start_time
     while current < end_time:
-        # Only show times that are in the future (at least 30 minutes from now)
-        if current > now + timedelta(minutes=30):
+        # Only show times that are in the future
+        if current > now:
             is_available = True
             for appointment in existing:
                 if appointment.appointment_time == current:
