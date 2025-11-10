@@ -62,7 +62,7 @@
     </script>
     
     <div class="appointment-stats">
-        <h2>Today's Appointments</h2>
+        <h2>Today's Appointments <span class="auto-refresh">🔄 Auto-refresh: 15s</span></h2>
         <div class="stats-row">
             <span class="stat">Total: {{ counts.total }}</span>
             <span class="stat completed">Completed: {{ counts.completed }}</span>
@@ -70,6 +70,7 @@
         </div>
     </div>
     
+    <div class="scroll-indicator">👈 Swipe left/right to see all barbers 👉</div>
     <div class="schedule-grid">
         <!-- Header with barber names -->
         <div class="grid-header">

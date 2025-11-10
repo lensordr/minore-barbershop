@@ -1,5 +1,10 @@
 // Simple JavaScript for enhanced UX
 document.addEventListener('DOMContentLoaded', function() {
+    // Show last refresh time
+    if (window.location.pathname === '/admin/dashboard') {
+        const now = new Date().toLocaleTimeString();
+        console.log('Dashboard loaded at:', now);
+    }
     // Add loading states to forms
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
@@ -12,10 +17,10 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Auto-refresh dashboard every 30 seconds
+    // Auto-refresh dashboard every 15 seconds to show new appointments
     if (window.location.pathname === '/admin/dashboard') {
         setInterval(() => {
             window.location.reload();
-        }, 30000);
+        }, 15000);
     }
 });
