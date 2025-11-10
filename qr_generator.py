@@ -2,7 +2,7 @@ import qrcode
 from io import BytesIO
 import base64
 
-def generate_qr_code(url="http://localhost:8000/book"):
+def generate_qr_code(url="https://web-production-c330c.up.railway.app/book"):
     """Generate QR code for the booking URL"""
     qr = qrcode.QRCode(
         version=1,
