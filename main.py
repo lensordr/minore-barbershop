@@ -66,6 +66,22 @@ async def auto_cleanup():
     finally:
         db.close()
 
+async def keep_alive():
+    """Keep app alive during business hours (10 AM - 7 PM)"""
+    import aiohttp
+    import os
+    
+    current_hour = datetime.now().hour
+    if 10 <= current_hour < 19:  # Only during business hours
+        try:
+            # Get the app URL from environment or use localhost
+            app_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:8000')
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"{app_url}/") as response:
+                    print(f"Keep-alive ping: {response.status} at {datetime.now().strftime('%H:%M')}")
+        except Exception as e:
+            print(f"Keep-alive error: {e}")
+
 # Schedule cleanup every day at 22:00
 scheduler.add_job(
     auto_cleanup,
@@ -74,10 +90,20 @@ scheduler.add_job(
     replace_existing=True
 )
 
+# Schedule keep-alive every 14 minutes during business hours
+scheduler.add_job(
+    keep_alive,
+    'interval',
+    minutes=14,
+    id='keep_alive',
+    replace_existing=True
+)
+
 @app.on_event("startup")
 async def startup_event():
     scheduler.start()
     print("Scheduler started - Auto cleanup at 22:00 daily")
+    print("Keep-alive active during business hours (10 AM - 7 PM)")
     print("MINORE BARBERSHOP - Ready for appointments!")
 
 @app.on_event("shutdown")
