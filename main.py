@@ -22,8 +22,7 @@ app = FastAPI(title="MINORE BARBERSHOP")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Global event for appointment updates
-appointment_updated = asyncio.Event()
+# Auto-refresh disabled
 
 # Create tables and ensure initial data
 models.Base.metadata.create_all(bind=models.engine)
@@ -70,21 +69,7 @@ async def auto_cleanup():
     finally:
         db.close()
 
-async def keep_alive():
-    """Keep app alive during business hours (10 AM - 7 PM)"""
-    import aiohttp
-    import os
-    
-    current_hour = datetime.now().hour
-    if 10 <= current_hour < 19:  # Only during business hours
-        try:
-            # Get the app URL from environment or use localhost
-            app_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:8000')
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{app_url}/") as response:
-                    print(f"Keep-alive ping: {response.status} at {datetime.now().strftime('%H:%M')}")
-        except Exception as e:
-            print(f"Keep-alive error: {e}")
+# Keep-alive function disabled
 
 # Schedule cleanup every day at 22:00
 scheduler.add_job(
@@ -94,14 +79,7 @@ scheduler.add_job(
     replace_existing=True
 )
 
-# Schedule keep-alive every 14 minutes during business hours
-scheduler.add_job(
-    keep_alive,
-    'interval',
-    minutes=14,
-    id='keep_alive',
-    replace_existing=True
-)
+# Keep-alive disabled
 
 @app.on_event("startup")
 async def startup_event():
@@ -140,8 +118,6 @@ async def create_appointment(
 ):
     try:
         appointment = crud.create_appointment(db, client_name, phone, service_id, barber_id, appointment_time)
-        appointment_updated.set()
-        appointment_updated.clear()
         return RedirectResponse(url="/success", status_code=303)
     except ValueError:
         services = crud.get_services(db)
@@ -173,6 +149,7 @@ async def admin_login_post(username: str = Form(...), password: str = Form(...))
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
 async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
+    print(f"Dashboard accessed at {datetime.now()}")
     appointments = crud.get_today_appointments_ordered(db)
     barbers = crud.get_barbers_with_revenue(db)
     services = crud.get_services(db)
@@ -267,11 +244,9 @@ async def add_manual_appointment(
 ):
     try:
         crud.create_appointment(db, client_name, phone, service_id, barber_id, appointment_time)
-        appointment_updated.set()
-        appointment_updated.clear()
+        return {"success": True, "message": f"Appointment added for {client_name}"}
     except ValueError:
-        pass  # Time slot already taken
-    return RedirectResponse(url="/admin/dashboard", status_code=303)
+        return {"success": False, "message": "Time slot already taken"}
 
 @app.post("/admin/update-schedule")
 async def update_schedule(
@@ -326,22 +301,7 @@ async def get_available_times(barber_id: int, db: Session = Depends(get_db)):
         }
     )
 
-@app.get("/api/appointment-updates")
-async def appointment_updates():
-    async def event_stream():
-        while True:
-            await appointment_updated.wait()
-            yield f"data: {{\"update\": true}}\n\n"
-            await asyncio.sleep(2)  # Wait 2 seconds before next check
-    
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/plain",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-        }
-    )
+# SSE endpoint removed - no auto refresh
 
 if __name__ == "__main__":
     import os
