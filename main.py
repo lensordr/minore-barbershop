@@ -64,7 +64,7 @@ async def keep_alive():
     import os
     
     current_hour = datetime.now().hour
-    if 10 <= current_hour < 19:  # Only during business hours
+    if 10 <= current_hour < 20:  # Only during business hours
         try:
             app_url = os.environ.get('RENDER_EXTERNAL_URL', 'http://localhost:8000')
             async with aiohttp.ClientSession() as session:
@@ -85,7 +85,7 @@ scheduler.add_job(
 @app.on_event("startup")
 async def startup_event():
     scheduler.start()
-    print("Keep-alive active during business hours (10 AM - 7 PM)")
+    print("Keep-alive active during business hours (10 AM - 8 PM)")
     print("MINORE BARBER - Ready for appointments!")
 
 @app.on_event("shutdown")
