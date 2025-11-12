@@ -17,10 +17,19 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Auto-refresh dashboard every 15 seconds to show new appointments
+    // Real-time updates for dashboard using Server-Sent Events
     if (window.location.pathname === '/admin/dashboard') {
-        setInterval(() => {
-            window.location.reload();
-        }, 15000);
+        const eventSource = new EventSource('/api/appointment-updates');
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (data.update) {
+                window.location.reload();
+            }
+        };
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            eventSource.close();
+        });
     }
 });

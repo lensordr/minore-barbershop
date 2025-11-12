@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, Cookie
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import models, crud
@@ -10,6 +10,7 @@ import uvicorn
 import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+import json
 
 def check_admin_auth(request: Request, admin_logged_in: str = Cookie(None)):
     if admin_logged_in != "true":
@@ -20,6 +21,9 @@ app = FastAPI(title="MINORE BARBERSHOP")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+# Global event for appointment updates
+appointment_updated = asyncio.Event()
 
 # Create tables and ensure initial data
 models.Base.metadata.create_all(bind=models.engine)
@@ -136,6 +140,8 @@ async def create_appointment(
 ):
     try:
         appointment = crud.create_appointment(db, client_name, phone, service_id, barber_id, appointment_time)
+        appointment_updated.set()
+        appointment_updated.clear()
         return RedirectResponse(url="/success", status_code=303)
     except ValueError:
         services = crud.get_services(db)
@@ -261,6 +267,8 @@ async def add_manual_appointment(
 ):
     try:
         crud.create_appointment(db, client_name, phone, service_id, barber_id, appointment_time)
+        appointment_updated.set()
+        appointment_updated.clear()
     except ValueError:
         pass  # Time slot already taken
     return RedirectResponse(url="/admin/dashboard", status_code=303)
@@ -315,6 +323,23 @@ async def get_available_times(barber_id: int, db: Session = Depends(get_db)):
             "Cache-Control": "no-cache, no-store, must-revalidate",
             "Pragma": "no-cache",
             "Expires": "0"
+        }
+    )
+
+@app.get("/api/appointment-updates")
+async def appointment_updates():
+    async def event_stream():
+        while True:
+            await appointment_updated.wait()
+            yield f"data: {{\"update\": true}}\n\n"
+            await asyncio.sleep(0.1)
+    
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
         }
     )
 

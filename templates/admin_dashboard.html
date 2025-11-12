@@ -116,8 +116,14 @@
                         </div>
                     {% endif %}
                 {% endfor %}
-                {% if not found %}
-                    <div class="empty-slot">{% if barber.active %}-{% else %}Closed{% endif %}</div>
+                {% if not found and barber.active %}
+                    <div class="empty-slot clickable-slot" 
+                         data-barber-id="{{ barber.id }}" 
+                         data-barber-name="{{ barber.name }}" 
+                         data-time="{{ hour }}" 
+                         onclick="openQuickBooking(this)">+</div>
+                {% elif not found %}
+                    <div class="empty-slot">Closed</div>
                 {% endif %}
             </div>
             {% endfor %}
@@ -145,4 +151,83 @@
     </div>
 </div>
 </div>
+
+<!-- Quick Booking Modal -->
+<div id="quickBookingModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeQuickBooking()">&times;</span>
+        <h3>Quick Appointment</h3>
+        <form id="quickBookingForm" method="POST" action="/admin/add-appointment">
+            <div class="form-group">
+                <label>Barber:</label>
+                <span id="selectedBarber"></span>
+            </div>
+            <div class="form-group">
+                <label>Time:</label>
+                <span id="selectedTime"></span>
+            </div>
+            <div class="form-group">
+                <label for="quickClientName">Client Name:</label>
+                <input type="text" id="quickClientName" name="client_name" required>
+            </div>
+            <div class="form-group">
+                <label for="quickPhone">Phone:</label>
+                <input type="tel" id="quickPhone" name="phone" required>
+            </div>
+            <div class="form-group">
+                <label for="quickService">Service:</label>
+                <select id="quickService" name="service_id" required>
+                    <option value="">Select service</option>
+                    {% for service in services %}
+                    <option value="{{ service.id }}">{{ service.name }} - €{{ service.price }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <input type="hidden" id="quickBarberId" name="barber_id">
+            <input type="hidden" id="quickAppointmentTime" name="appointment_time">
+            <div class="form-actions">
+                <button type="button" onclick="closeQuickBooking()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Appointment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openQuickBooking(slot) {
+    const barberId = slot.dataset.barberId;
+    const barberName = slot.dataset.barberName;
+    const time = slot.dataset.time;
+    
+    document.getElementById('selectedBarber').textContent = barberName;
+    document.getElementById('selectedTime').textContent = time;
+    document.getElementById('quickBarberId').value = barberId;
+    
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('quickAppointmentTime').value = `${today}T${time}:00`;
+    
+    document.getElementById('quickBookingModal').style.display = 'block';
+    document.getElementById('quickClientName').focus();
+}
+
+function closeQuickBooking() {
+    document.getElementById('quickBookingModal').style.display = 'none';
+    document.getElementById('quickBookingForm').reset();
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('quickBookingModal');
+    if (event.target == modal) {
+        closeQuickBooking();
+    }
+}
+
+// Auto-refresh dashboard when appointment is added
+document.getElementById('quickBookingForm').addEventListener('submit', function() {
+    setTimeout(() => {
+        window.location.reload();
+    }, 500);
+});
+</script>
 {% endblock %}
