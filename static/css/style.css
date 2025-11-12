@@ -319,6 +319,8 @@ main {
     width: 100%;
 }
 
+/* Removed span classes - using inline styles now */
+
 .grid-header {
     display: grid;
     grid-template-columns: 100px repeat(9, 1fr);
@@ -352,7 +354,7 @@ main {
     grid-template-columns: 100px repeat(9, 1fr);
     background: #1d1a1c;
     border-bottom: 1px solid #444;
-    min-height: 60px;
+    height: 60px;
     min-width: 100%;
     width: 100%;
 }
@@ -374,8 +376,15 @@ main {
     background: #1d1a1c;
     border-right: 1px solid #444;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    position: relative;
+    height: 60px;
+    overflow: visible;
+}
+
+.multi-slot {
+    overflow: visible;
 }
 
 .appointment-item {
@@ -385,6 +394,23 @@ main {
     width: 100%;
     text-align: center;
     border-left: 3px solid #28a745;
+}
+
+.appointment-completed {
+    background: #155724 !important;
+    border-left: 3px solid #0d4419 !important;
+    color: white !important;
+}
+
+.appointment-scheduled {
+    background: #f8d7da !important;
+    border-left: 3px solid #dc3545 !important;
+    color: #721c24 !important;
+}
+
+.appointment-cancelled {
+    background: #f8d7da !important;
+    border-left: 3px solid #dc3545 !important;
 }
 
 .client-name {
@@ -728,6 +754,8 @@ main {
     max-width: 500px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     position: relative;
+    margin: auto;
+    transform: translateY(0);
 }
 
 .modal-content h3 {

@@ -37,6 +37,8 @@ class Appointment(Base):
     barber_id = Column(Integer, ForeignKey("barbers.id", ondelete="CASCADE"))
     service_id = Column(Integer, ForeignKey("services.id", ondelete="CASCADE"))
     status = Column(String, default="scheduled")  # scheduled, completed, cancelled
+    custom_price = Column(Float, default=None)  # Override service price
+    custom_duration = Column(Integer, default=None)  # Override service duration
     
     barber = relationship("Barber", back_populates="appointments")
     service = relationship("Service", back_populates="appointments")

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Book Appointment - MINORE BARBERSHOP{% endblock %}
+{% block title %}Book Appointment - MINORE BARBER{% endblock %}
 
 {% block content %}
 <div class="booking-form">
@@ -16,10 +16,7 @@
             <input type="text" id="client_name" name="client_name" required>
         </div>
         
-        <div class="form-group">
-            <label for="phone">Phone Number</label>
-            <input type="tel" id="phone" name="phone" required>
-        </div>
+
         
         <div class="form-group">
             <label for="service_id">Service</label>
@@ -57,15 +54,16 @@
 
 {% block scripts %}
 <script>
-document.getElementById('barber_id').addEventListener('change', function() {
-    const barberId = this.value;
+function updateAvailableTimes() {
+    const barberId = document.getElementById('barber_id').value;
+    const serviceId = document.getElementById('service_id').value;
     const timeSelect = document.getElementById('appointment_time');
     
-    if (barberId) {
+    if (barberId && serviceId) {
         timeSelect.innerHTML = '<option value="">Loading times...</option>';
         timeSelect.disabled = true;
         
-        fetch(`/api/available-times/${barberId}?t=${Date.now()}`)
+        fetch(`/api/available-times/${barberId}/${serviceId}?t=${Date.now()}`)
             .then(response => response.json())
             .then(times => {
                 timeSelect.innerHTML = '<option value="">Select a time</option>';
@@ -81,9 +79,12 @@ document.getElementById('barber_id').addEventListener('change', function() {
                 timeSelect.disabled = false;
             });
     } else {
-        timeSelect.innerHTML = '<option value="">Select barber first</option>';
+        timeSelect.innerHTML = '<option value="">Select service and barber first</option>';
         timeSelect.disabled = true;
     }
-});
+}
+
+document.getElementById('barber_id').addEventListener('change', updateAvailableTimes);
+document.getElementById('service_id').addEventListener('change', updateAvailableTimes);
 </script>
 {% endblock %}

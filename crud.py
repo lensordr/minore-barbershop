@@ -64,15 +64,64 @@ def create_appointment(db: Session, client_name: str, phone: str, service_id: in
     if appointment_dt < earliest_time:
         raise ValueError("Cannot book appointments in current or past time slots")
     
-    # Check if slot is already taken
-    existing = db.query(models.Appointment).filter(
-        models.Appointment.barber_id == barber_id,
-        models.Appointment.appointment_time == appointment_dt,
-        models.Appointment.status != "cancelled"
-    ).first()
+    # Get service duration
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if not service:
+        raise ValueError("Service not found")
     
-    if existing:
-        raise ValueError("Time slot already booked")
+    service_duration = service.duration
+    appointment_end = appointment_dt + timedelta(minutes=service_duration)
+    
+    # Check for time conflicts with existing appointments
+    existing_appointments = db.query(models.Appointment).filter(
+        models.Appointment.barber_id == barber_id,
+        models.Appointment.status != "cancelled"
+    ).all()
+    
+    for existing in existing_appointments:
+        existing_duration = existing.custom_duration or existing.service.duration
+        existing_end = existing.appointment_time + timedelta(minutes=existing_duration)
+        
+        # Check if appointments overlap
+        if (appointment_dt < existing_end and appointment_end > existing.appointment_time):
+            raise ValueError("Time slot conflicts with existing appointment")
+    
+    appointment = models.Appointment(
+        client_name=client_name,
+        phone=phone,
+        service_id=service_id,
+        barber_id=barber_id,
+        appointment_time=appointment_dt
+    )
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    return appointment
+
+def create_appointment_admin(db: Session, client_name: str, phone: str, service_id: int, barber_id: int, appointment_time: str):
+    appointment_dt = datetime.fromisoformat(appointment_time)
+    
+    # Get service duration
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if not service:
+        raise ValueError("Service not found")
+    
+    service_duration = service.duration
+    appointment_end = appointment_dt + timedelta(minutes=service_duration)
+    
+    # Check for time conflicts with existing appointments
+    existing_appointments = db.query(models.Appointment).filter(
+        models.Appointment.barber_id == barber_id,
+        models.Appointment.status != "cancelled"
+    ).all()
+    
+    for existing in existing_appointments:
+        existing_duration = existing.custom_duration or existing.service.duration
+        existing_end = existing.appointment_time + timedelta(minutes=existing_duration)
+        
+        # Check if appointments overlap
+        if (appointment_dt < existing_end and appointment_end > existing.appointment_time):
+            raise ValueError("Time slot conflicts with existing appointment")
     
     appointment = models.Appointment(
         client_name=client_name,
@@ -115,10 +164,17 @@ def get_today_appointment_counts(db: Session):
     
     return {"total": total, "completed": completed, "cancelled": cancelled}
 
-def get_available_times(db: Session, barber_id: int):
+def get_available_times_for_service(db: Session, barber_id: int, service_id: int):
     now = datetime.now()
     today = now.date()
     schedule = get_schedule(db)
+    
+    # Get service duration
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if not service:
+        return []
+    
+    service_duration = service.duration
     
     start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
     end_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.end_hour))
@@ -128,18 +184,16 @@ def get_available_times(db: Session, barber_id: int):
     current_minute = now.minute
     
     if current_minute < 30:
-        # If it's before :30, next slot is :30 of current hour
         next_hour = current_hour
         next_minute = 30
     else:
-        # If it's after :30, next slot is :00 of next hour
         next_hour = current_hour + 1
         next_minute = 0
     
     earliest_time = datetime.combine(today, datetime.min.time().replace(hour=next_hour, minute=next_minute))
     
     # Get existing appointments for this barber today (exclude cancelled)
-    existing = db.query(models.Appointment).filter(
+    existing_appointments = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
         models.Appointment.appointment_time >= start_time,
         models.Appointment.appointment_time <= end_time,
@@ -150,16 +204,23 @@ def get_available_times(db: Session, barber_id: int):
     available_times = []
     current = start_time
     while current < end_time:
-        # Only show times from the next available slot onwards
         if current >= earliest_time:
-            is_available = True
-            for appointment in existing:
-                if appointment.appointment_time == current:
-                    is_available = False
-                    break
-            
-            if is_available:
-                available_times.append(current.strftime("%H:%M"))
+            # Check if service would fit before closing time
+            service_end = current + timedelta(minutes=service_duration)
+            if service_end <= end_time:
+                # Check for conflicts with existing appointments
+                has_conflict = False
+                for existing in existing_appointments:
+                    existing_duration = existing.custom_duration or existing.service.duration
+                    existing_end = existing.appointment_time + timedelta(minutes=existing_duration)
+                    
+                    # Check if appointments would overlap
+                    if (current < existing_end and service_end > existing.appointment_time):
+                        has_conflict = True
+                        break
+                
+                if not has_conflict:
+                    available_times.append(current.strftime("%H:%M"))
         
         current += timedelta(minutes=30)
     
@@ -192,7 +253,7 @@ def get_barbers_with_revenue(db: Session):
             models.Appointment.status == "completed"
         ).all()
         
-        barber.today_revenue = sum(apt.service.price for apt in completed_appointments)
+        barber.today_revenue = sum(apt.custom_price or apt.service.price for apt in completed_appointments)
         barber.today_appointments = len(completed_appointments)
         
         # Get total scheduled appointments for today
@@ -229,7 +290,7 @@ def checkout_appointment(db: Session, appointment_id: int):
             )
             db.add(monthly_record)
         
-        monthly_record.revenue += appointment.service.price
+        monthly_record.revenue += appointment.custom_price or appointment.service.price
         monthly_record.appointments_count += 1
         
         # Save to daily revenue
@@ -248,7 +309,7 @@ def checkout_appointment(db: Session, appointment_id: int):
             )
             db.add(daily_record)
         
-        daily_record.revenue += appointment.service.price
+        daily_record.revenue += appointment.custom_price or appointment.service.price
         daily_record.appointments_count += 1
         
         db.commit()
@@ -261,6 +322,38 @@ def cancel_appointment(db: Session, appointment_id: int):
         appointment.status = "cancelled"
         db.commit()
         db.refresh(appointment)
+    return appointment
+
+def update_appointment_details(db: Session, appointment_id: int, time: str, price: float, duration: int):
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if not appointment:
+        raise ValueError("Appointment not found")
+    
+    # Update time (keep same date, change time)
+    current_date = appointment.appointment_time.date()
+    new_time = datetime.strptime(time, "%H:%M").time()
+    new_datetime = datetime.combine(current_date, new_time)
+    
+    # Check if new time slot is available (exclude current appointment)
+    existing = db.query(models.Appointment).filter(
+        models.Appointment.barber_id == appointment.barber_id,
+        models.Appointment.appointment_time == new_datetime,
+        models.Appointment.status != "cancelled",
+        models.Appointment.id != appointment_id
+    ).first()
+    
+    if existing:
+        raise ValueError("Time slot already booked")
+    
+    # Update appointment
+    appointment.appointment_time = new_datetime
+    
+    # Update appointment-specific price and duration
+    appointment.custom_price = price
+    appointment.custom_duration = duration
+    
+    db.commit()
+    db.refresh(appointment)
     return appointment
 
 def delete_barber(db: Session, barber_id: int):

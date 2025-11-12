@@ -17,7 +17,7 @@ def check_admin_auth(request: Request, admin_logged_in: str = Cookie(None)):
         return RedirectResponse(url="/admin/login", status_code=303)
     return True
 
-app = FastAPI(title="MINORE BARBERSHOP")
+app = FastAPI(title="MINORE BARBER")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -86,7 +86,7 @@ scheduler.add_job(
 async def startup_event():
     scheduler.start()
     print("Keep-alive active during business hours (10 AM - 7 PM)")
-    print("MINORE BARBERSHOP - Ready for appointments!")
+    print("MINORE BARBER - Ready for appointments!")
 
 @app.on_event("shutdown")
 async def shutdown_event():
@@ -120,14 +120,13 @@ async def book_appointment(request: Request, db: Session = Depends(get_db)):
 async def create_appointment(
     request: Request,
     client_name: str = Form(...),
-    phone: str = Form(...),
     service_id: int = Form(...),
     barber_id: int = Form(...),
     appointment_time: str = Form(...),
     db: Session = Depends(get_db)
 ):
     try:
-        appointment = crud.create_appointment(db, client_name, phone, service_id, barber_id, appointment_time)
+        appointment = crud.create_appointment(db, client_name, "", service_id, barber_id, appointment_time)
         # Trigger dashboard refresh for admin
         return RedirectResponse(url="/success", status_code=303)
     except ValueError:
@@ -166,6 +165,11 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
     services = crud.get_services(db)
     schedule = crud.get_schedule(db)
     counts = crud.get_today_appointment_counts(db)
+    
+    # Create grid data with appointment spans
+    from grid_helper import create_appointment_grid
+    grid_data = create_appointment_grid(db, appointments, schedule)
+    
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "appointments": appointments,
@@ -174,6 +178,7 @@ async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
         "services": services,
         "schedule": schedule,
         "counts": counts,
+        "grid_data": grid_data,
         "now": datetime.now()
     })
 
@@ -244,17 +249,31 @@ async def cancel_appointment(appointment_id: int, db: Session = Depends(get_db))
     crud.cancel_appointment(db, appointment_id)
     return RedirectResponse(url="/admin/dashboard", status_code=303)
 
+@app.post("/admin/edit-appointment")
+async def edit_appointment(
+    appointment_id: int = Form(...),
+    time: str = Form(...),
+    price: float = Form(...),
+    duration: int = Form(...),
+    db: Session = Depends(get_db)
+):
+    try:
+        crud.update_appointment_details(db, appointment_id, time, price, duration)
+        return {"success": True, "message": "Appointment updated successfully"}
+    except ValueError as e:
+        return {"success": False, "message": str(e)}
+
 @app.post("/admin/add-appointment")
 async def add_manual_appointment(
     client_name: str = Form(...),
-    phone: str = Form(...),
     service_id: int = Form(...),
     barber_id: int = Form(...),
     appointment_time: str = Form(...),
     db: Session = Depends(get_db)
 ):
     try:
-        crud.create_appointment(db, client_name, phone, service_id, barber_id, appointment_time)
+        # Admin can create appointments at any time - bypass time validation
+        crud.create_appointment_admin(db, client_name, "", service_id, barber_id, appointment_time)
         return {"success": True, "message": f"Appointment added for {client_name}"}
     except ValueError:
         return {"success": False, "message": "Time slot already taken"}
@@ -276,22 +295,33 @@ async def cleanup_daily(db: Session = Depends(get_db)):
 
 @app.get("/admin/revenue", response_class=HTMLResponse)
 async def revenue_reports(request: Request, view: str = "monthly", date: str = None, db: Session = Depends(get_db)):
-    if view == "daily":
-        revenue_data = crud.get_daily_revenue(db, date)
-        template = "daily_revenue.html"
-    elif view == "weekly":
-        revenue_data = crud.get_weekly_revenue(db, date)
-        template = "weekly_revenue.html"
+    # Always show login form first
+    return templates.TemplateResponse("revenue_login.html", {"request": request})
+
+@app.post("/admin/revenue-login")
+async def revenue_login_post(request: Request, password: str = Form(...), view: str = Form("monthly"), date: str = Form(None), db: Session = Depends(get_db)):
+    if password == "minorebarber2025":
+        if view == "daily":
+            revenue_data = crud.get_daily_revenue(db, date)
+            template = "daily_revenue.html"
+        elif view == "weekly":
+            revenue_data = crud.get_weekly_revenue(db, date)
+            template = "weekly_revenue.html"
+        else:
+            revenue_data = crud.get_monthly_revenue(db)
+            template = "monthly_revenue.html"
+        
+        return templates.TemplateResponse(template, {
+            "request": request,
+            "revenue_data": revenue_data,
+            "current_view": view,
+            "selected_date": date or datetime.now().strftime('%Y-%m-%d')
+        })
     else:
-        revenue_data = crud.get_monthly_revenue(db)
-        template = "monthly_revenue.html"
-    
-    return templates.TemplateResponse(template, {
-        "request": request,
-        "revenue_data": revenue_data,
-        "current_view": view,
-        "selected_date": date or datetime.now().strftime('%Y-%m-%d')
-    })
+        return templates.TemplateResponse("revenue_login.html", {
+            "request": request,
+            "error": "Invalid password"
+        })
 
 @app.get("/admin/logout")
 async def admin_logout():
@@ -299,10 +329,10 @@ async def admin_logout():
     response.delete_cookie("admin_logged_in")
     return response
 
-@app.get("/api/available-times/{barber_id}")
-async def get_available_times(barber_id: int, db: Session = Depends(get_db)):
+@app.get("/api/available-times/{barber_id}/{service_id}")
+async def get_available_times(barber_id: int, service_id: int, db: Session = Depends(get_db)):
     from fastapi.responses import JSONResponse
-    times = crud.get_available_times(db, barber_id)
+    times = crud.get_available_times_for_service(db, barber_id, service_id)
     return JSONResponse(
         content=times,
         headers={

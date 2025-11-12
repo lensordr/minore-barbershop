@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - MINORE BARBERSHOP{% endblock %}
+{% block title %}Dashboard - MINORE BARBER{% endblock %}
 
 {% block header %}
 <nav class="admin-nav">
@@ -14,12 +14,9 @@
 {% block content %}
 <div class="container full-width">
 <div class="dashboard">
-    <div class="quick-add">
-        <h3>Click on a time slot (+) to add appointment</h3>
-        {% if message %}
-        <div class="success-message" style="background: #d4edda; color: #155724; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;">{{ message }}</div>
-        {% endif %}
-    </div>
+    {% if message %}
+    <div class="success-message" style="background: #d4edda; color: #155724; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;">{{ message }}</div>
+    {% endif %}
     
     <div class="appointment-stats">
         <h2>Today's Appointments</h2>
@@ -42,48 +39,30 @@
         </div>
         
         <!-- Time rows with appointments -->
-        {% set hours = [] %}
-        {% for h in range(schedule.start_hour, schedule.end_hour) %}
-            {% set _ = hours.append('%02d:00'|format(h)) %}
-            {% set _ = hours.append('%02d:30'|format(h)) %}
-        {% endfor %}
-        {% for hour in hours %}
+        {% for hour in grid_data.hours %}
         <div class="grid-row">
             <div class="time-cell">{{ hour }}</div>
             {% for barber in all_barbers %}
             <div class="appointment-cell{% if not barber.active %} inactive-cell{% endif %}">
-                {% set found = false %}
-                {% for appointment in appointments %}
-                    {% if appointment.appointment_time.strftime('%H:%M') == hour and appointment.barber_id == barber.id %}
-                        {% set found = true %}
-                        <div class="appointment-item">
-                            <div class="client-name">{{ appointment.client_name }}</div>
-                            <div class="service-name">{{ appointment.service.name }}</div>
-                            <div class="appointment-actions">
-                                {% if appointment.status == "scheduled" %}
-                                <form method="POST" action="/admin/checkout/{{ appointment.id }}" style="display: inline;">
-                                    <button type="submit" class="btn-mini btn-complete">✓</button>
-                                </form>
-                                <form method="POST" action="/admin/cancel/{{ appointment.id }}" style="display: inline;">
-                                    <button type="submit" class="btn-mini btn-cancel" onclick="return confirm('Cancel?')">✗</button>
-                                </form>
-                                {% else %}
-                                <span class="status-mini {{ appointment.status }}">
-                                    {% if appointment.status == "completed" %}✓{% else %}✗{% endif %}
-                                </span>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endif %}
-                {% endfor %}
-                {% if not found and barber.active %}
+                {% set slot = grid_data.grid[barber.id][hour] %}
+                {% if slot.type == "appointment" %}
+                    {% set appointment = slot.appointment %}
+                    {% set duration = appointment.custom_duration or appointment.service.duration %}
+                    <div class="appointment-item appointment-{{ appointment.status }}" 
+                         onclick="editAppointment({{ appointment.id }}, '{{ appointment.client_name }}', '{{ appointment.service.name }}', {{ appointment.custom_price or appointment.service.price }}, {{ duration }}, '{{ appointment.appointment_time.strftime('%H:%M') }}', '{{ appointment.status }}')" 
+                         style="cursor: pointer; height: {{ slot.span_rows * 60 - 4 }}px; margin-bottom: -{{ (slot.span_rows - 1) * 60 }}px; z-index: 10; position: relative;">
+                        <div class="client-name">{{ appointment.client_name }}</div>
+                    </div>
+                {% elif slot.type == "continuation" %}
+                    <!-- Covered by appointment card above -->
+                {% elif slot.type == "empty" and barber.active %}
                     <div class="empty-slot clickable-slot" 
                          data-barber-id="{{ barber.id }}" 
                          data-barber-name="{{ barber.name }}" 
                          data-time="{{ hour }}" 
                          onclick="openQuickBooking(this)">+</div>
-                {% elif not found %}
-                    <div class="empty-slot">Closed</div>
+                {% else %}
+                    <div class="empty-slot">{% if barber.active %}-{% else %}Closed{% endif %}</div>
                 {% endif %}
             </div>
             {% endfor %}
@@ -97,18 +76,7 @@
     </div>
     {% endif %}
     
-    <div class="revenue-summary">
-        <h3>Today's Revenue by Barber</h3>
-        <div class="revenue-grid">
-            {% for barber in barbers %}
-            <div class="revenue-card">
-                <h4>{{ barber.name }}</h4>
-                <div class="revenue-amount">€{{ "%.2f"|format(barber.today_revenue) }}</div>
-                <div class="appointments-count">{{ barber.today_appointments }} completed / {{ barber.total_today_appointments }} total</div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
+
 </div>
 </div>
 
@@ -130,10 +98,7 @@
                 <label for="quickClientName">Client Name:</label>
                 <input type="text" id="quickClientName" name="client_name" required>
             </div>
-            <div class="form-group">
-                <label for="quickPhone">Phone:</label>
-                <input type="tel" id="quickPhone" name="phone" required>
-            </div>
+
             <div class="form-group">
                 <label for="quickService">Service:</label>
                 <select id="quickService" name="service_id" required>
@@ -148,6 +113,47 @@
             <div class="form-actions">
                 <button type="button" onclick="closeQuickBooking()" class="btn btn-secondary">Cancel</button>
                 <button type="submit" class="btn btn-primary">Add Appointment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Appointment Modal -->
+<div id="editAppointmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditAppointment()">&times;</span>
+        <h3>Edit Appointment</h3>
+        <div style="margin-bottom: 1rem;">
+            <button type="button" onclick="document.getElementById('editAppointmentForm').dispatchEvent(new Event('submit'))" class="btn btn-primary" style="width: 100%;">Update Appointment</button>
+        </div>
+        <form id="editAppointmentForm" onsubmit="submitEditAppointment(event)">
+            <div class="form-group">
+                <label>Client:</label>
+                <span id="editClientName"></span>
+            </div>
+            <div class="form-group">
+                <label>Service:</label>
+                <span id="editServiceName"></span>
+            </div>
+            <div class="form-group">
+                <label for="editTime">Time:</label>
+                <input type="time" id="editTime" name="time" required>
+            </div>
+            <div class="form-group">
+                <label for="editPrice">Price (€):</label>
+                <input type="number" id="editPrice" name="price" step="0.01" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="editDuration">Duration (minutes):</label>
+                <input type="number" id="editDuration" name="duration" min="1" required>
+            </div>
+            <input type="hidden" id="editAppointmentId" name="appointment_id">
+            <div class="form-actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <div id="appointmentActions" style="display: flex; gap: 0.5rem;">
+                    <button type="button" onclick="completeAppointment()" class="btn btn-primary" style="padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">Complete & Checkout</button>
+                    <button type="button" onclick="cancelAppointment()" class="btn btn-cancel" style="padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">Cancel Appointment</button>
+                </div>
+                <button type="button" onclick="closeEditAppointment()" class="btn btn-secondary">Close</button>
             </div>
         </form>
     </div>
@@ -203,6 +209,94 @@ function submitQuickBooking(event) {
             alert(data.message);
         }
     });
+}
+
+// Edit appointment functions
+function editAppointment(id, clientName, serviceName, price, duration, time, status) {
+    document.getElementById('editAppointmentId').value = id;
+    document.getElementById('editClientName').textContent = clientName;
+    document.getElementById('editServiceName').textContent = serviceName;
+    document.getElementById('editTime').value = time;
+    document.getElementById('editPrice').value = price;
+    document.getElementById('editDuration').value = duration;
+    
+    // Show/hide action buttons based on status
+    const actionButtons = document.getElementById('appointmentActions');
+    if (status === 'scheduled') {
+        actionButtons.style.display = 'block';
+    } else {
+        actionButtons.style.display = 'none';
+    }
+    
+    document.getElementById('editAppointmentModal').style.display = 'block';
+}
+
+function closeEditAppointment() {
+    document.getElementById('editAppointmentModal').style.display = 'none';
+    document.getElementById('editAppointmentForm').reset();
+}
+
+function submitEditAppointment(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch('/admin/edit-appointment', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        closeEditAppointment();
+        if (data.success) {
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            alert(data.message);
+        }
+    });
+}
+
+function completeAppointment() {
+    const appointmentId = document.getElementById('editAppointmentId').value;
+    const currentPrice = document.getElementById('editPrice').value;
+    const currentDuration = document.getElementById('editDuration').value;
+    const currentTime = document.getElementById('editTime').value;
+    
+    // First update the appointment with current form values
+    const formData = new FormData();
+    formData.append('appointment_id', appointmentId);
+    formData.append('time', currentTime);
+    formData.append('price', currentPrice);
+    formData.append('duration', currentDuration);
+    
+    fetch('/admin/edit-appointment', {
+        method: 'POST',
+        body: formData
+    })
+    .then(() => {
+        // Then complete the appointment
+        return fetch(`/admin/checkout/${appointmentId}`, {
+            method: 'POST'
+        });
+    })
+    .then(() => {
+        closeEditAppointment();
+        setTimeout(() => window.location.reload(), 1000);
+    });
+}
+
+function cancelAppointment() {
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+        const appointmentId = document.getElementById('editAppointmentId').value;
+        
+        fetch(`/admin/cancel/${appointmentId}`, {
+            method: 'POST'
+        })
+        .then(() => {
+            closeEditAppointment();
+            setTimeout(() => window.location.reload(), 1000);
+        });
+    }
 }
 </script>
 {% endblock %}
