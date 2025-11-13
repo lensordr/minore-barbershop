@@ -294,34 +294,45 @@ async def cleanup_daily(db: Session = Depends(get_db)):
     return RedirectResponse(url="/admin/dashboard", status_code=303)
 
 @app.get("/admin/revenue", response_class=HTMLResponse)
-async def revenue_reports(request: Request, view: str = "monthly", date: str = None, db: Session = Depends(get_db)):
-    # Always show login form first
-    return templates.TemplateResponse("revenue_login.html", {"request": request})
+async def revenue_reports(request: Request, view: str = "monthly", date: str = None, revenue_logged_in: str = Cookie(None), db: Session = Depends(get_db)):
+    # Only ask for password if not logged in AND it's the main revenue access (no view parameter from URL)
+    if revenue_logged_in != "true" and not request.url.query:
+        return templates.TemplateResponse("revenue_login.html", {"request": request})
+    
+    if view == "daily":
+        revenue_data = crud.get_daily_revenue(db, date)
+        template = "daily_revenue.html"
+    elif view == "weekly":
+        revenue_data = crud.get_weekly_revenue(db, date)
+        template = "weekly_revenue.html"
+    else:
+        revenue_data = crud.get_monthly_revenue(db)
+        template = "monthly_revenue.html"
+    
+    return templates.TemplateResponse(template, {
+        "request": request,
+        "revenue_data": revenue_data,
+        "current_view": view,
+        "selected_date": date or datetime.now().strftime('%Y-%m-%d')
+    })
 
 @app.post("/admin/revenue-login")
-async def revenue_login_post(request: Request, password: str = Form(...), view: str = Form("monthly"), date: str = Form(None), db: Session = Depends(get_db)):
+async def revenue_login_post(request: Request, password: str = Form(...), db: Session = Depends(get_db)):
     if password == "minorebarber2025":
-        if view == "daily":
-            revenue_data = crud.get_daily_revenue(db, date)
-            template = "daily_revenue.html"
-        elif view == "weekly":
-            revenue_data = crud.get_weekly_revenue(db, date)
-            template = "weekly_revenue.html"
-        else:
-            revenue_data = crud.get_monthly_revenue(db)
-            template = "monthly_revenue.html"
-        
-        return templates.TemplateResponse(template, {
-            "request": request,
-            "revenue_data": revenue_data,
-            "current_view": view,
-            "selected_date": date or datetime.now().strftime('%Y-%m-%d')
-        })
+        response = RedirectResponse(url="/admin/revenue", status_code=303)
+        response.set_cookie("revenue_logged_in", "true")  # Session-based
+        return response
     else:
         return templates.TemplateResponse("revenue_login.html", {
             "request": request,
             "error": "Invalid password"
         })
+
+@app.get("/admin/revenue-logout")
+async def revenue_logout():
+    response = RedirectResponse(url="/admin/dashboard", status_code=303)
+    response.delete_cookie("revenue_logged_in")
+    return response
 
 @app.get("/admin/logout")
 async def admin_logout():
