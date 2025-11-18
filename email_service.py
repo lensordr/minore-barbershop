@@ -12,6 +12,9 @@ def generate_cancel_token():
 
 def send_appointment_email(client_email, client_name, appointment_time, service_name, barber_name, cancel_token):
     try:
+        print(f"Email config: {os.getenv('EMAIL_HOST')}:{os.getenv('EMAIL_PORT')}")
+        print(f"From: {os.getenv('EMAIL_FROM')} To: {client_email}")
+        
         msg = MIMEMultipart()
         msg['From'] = os.getenv('EMAIL_FROM')
         msg['To'] = client_email
@@ -47,15 +50,22 @@ def send_appointment_email(client_email, client_name, appointment_time, service_
         
         msg.attach(MIMEText(body, 'plain'))
         
+        print("Connecting to SMTP...")
         server = smtplib.SMTP(os.getenv('EMAIL_HOST'), int(os.getenv('EMAIL_PORT')))
+        print("Starting TLS...")
         server.starttls()
+        print(f"Logging in with user: {os.getenv('EMAIL_USER')}")
         server.login(os.getenv('EMAIL_USER'), os.getenv('EMAIL_PASSWORD'))
+        print("Sending message...")
         server.send_message(msg)
         server.quit()
+        print("Email sent successfully!")
         
         return True
     except Exception as e:
         print(f"Email error: {e}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
         return False
 
 def send_cancellation_email(client_email, client_name, appointment_time, service_name):
