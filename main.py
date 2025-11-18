@@ -442,6 +442,12 @@ async def confirm_cancel_appointment(request: Request, cancel_token: str, db: Se
         appointment.status = "cancelled"
         db.commit()
         
+        # Trigger dashboard refresh
+        global last_booking_time
+        import time
+        last_booking_time = time.time()
+        print(f"Appointment cancelled! Updated last_booking_time to {last_booking_time}")
+        
         # Send cancellation email async
         import threading
         def send_cancel_email_async():
