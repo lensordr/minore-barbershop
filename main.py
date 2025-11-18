@@ -164,8 +164,17 @@ async def create_appointment(
         if barber_id == "random":
             appointment.is_random = 1
             db.commit()
-        # Email temporarily disabled for fast booking
-        print(f"Appointment created for {client_name} - Email would be sent to {client_email}")
+        # Send email with detailed error logging
+        try:
+            service = crud.get_service_by_id(db, service_id)
+            barber = crud.get_barber_by_id(db, actual_barber_id)
+            print(f"Attempting to send email to {client_email}...")
+            success = send_appointment_email(client_email, client_name, appointment.appointment_time, service.name, barber.name, appointment.cancel_token)
+            print(f"Email send result: {success}")
+        except Exception as e:
+            print(f"Email error: {str(e)}")
+            import traceback
+            print(f"Full error: {traceback.format_exc()}")
         
         # Update refresh flag
         global last_booking_time
