@@ -164,10 +164,13 @@ async def create_appointment(
         if barber_id == "random":
             appointment.is_random = 1
             db.commit()
-        # Send email
-        service = crud.get_service_by_id(db, service_id)
-        barber = crud.get_barber_by_id(db, actual_barber_id)
-        send_appointment_email(client_email, client_name, appointment.appointment_time, service.name, barber.name, appointment.cancel_token)
+        # Send email asynchronously (don't block response)
+        try:
+            service = crud.get_service_by_id(db, service_id)
+            barber = crud.get_barber_by_id(db, actual_barber_id)
+            send_appointment_email(client_email, client_name, appointment.appointment_time, service.name, barber.name, appointment.cancel_token)
+        except Exception as e:
+            print(f"Email sending failed: {e}")  # Log but don't block
         
         # Update refresh flag
         global last_booking_time
