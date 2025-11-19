@@ -143,7 +143,7 @@ async def book_appointment(request: Request, db: Session = Depends(get_db)):
 async def create_appointment(
     request: Request,
     client_name: str = Form(...),
-    client_email: str = Form(...),
+    client_email: str = Form(""),
     client_phone: str = Form(...),
     service_id: int = Form(...),
     barber_id: str = Form(...),
