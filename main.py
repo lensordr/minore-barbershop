@@ -64,27 +64,8 @@ try:
 except Exception as e:
     print(f"Migration error: {e}")
 
-# Ensure initial data exists only if database is empty
-try:
-    from sqlalchemy.orm import sessionmaker
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=models.engine)
-    db = SessionLocal()
-    
-    # Only add default services if none exist
-    if not crud.get_services(db):
-        default_services = [
-            ("Corte de pelo / Haircut", "Traditional scissor cut with styling", 30, 20.00),
-            ("Arreglado Barba / Beard Trim", "Professional beard shaping and trimming", 30, 12.00),
-            ("Corte + Barba Ritual / Haircut + Beard Ritual", "Complete grooming package", 60, 34.00),
-            ("Corte Barba Express / Beard Trim Express", "Quick beard trim", 30, 25.00),
-            ("Ritual Barba / Beard Ritual", "Full beard treatment", 30, 14.00)
-        ]
-        for service_name, description, duration, price in default_services:
-            crud.create_service(db, service_name, duration, price, description)
-    
-    db.close()
-except Exception as e:
-    print(f"Initial data setup error: {e}")
+# Database is ready for manual data entry
+# No automatic data insertion
 
 # Keep-alive scheduler
 scheduler = AsyncIOScheduler()
