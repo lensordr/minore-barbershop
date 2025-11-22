@@ -753,6 +753,8 @@ main {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+    padding: 20px;
+    overflow-y: auto;
 }
 
 .modal-content {
@@ -762,6 +764,8 @@ main {
     border: 1px solid #333;
     width: 90%;
     max-width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     position: relative;
     margin: auto;
@@ -1127,6 +1131,23 @@ main {
     font-size: 0.8rem;
     border-radius: 4px;
     margin-bottom: 0.5rem;
+}
+
+/* Tablet Responsive */
+@media (max-width: 1024px) and (min-width: 769px) {
+    .modal-content {
+        max-height: 85vh;
+        padding: 1.5rem;
+    }
+    
+    .form-actions {
+        position: sticky;
+        bottom: 0;
+        background: #2a2529;
+        padding-top: 1rem;
+        margin-top: 1rem;
+        border-top: 1px solid #444;
+    }
 }
 
 /* Mobile Responsive */
