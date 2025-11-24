@@ -94,6 +94,17 @@ scheduler.add_job(
     replace_existing=True
 )
 
+# Schedule daily revenue email at 9 AM
+from daily_revenue_email import send_daily_revenue_email
+scheduler.add_job(
+    send_daily_revenue_email,
+    'cron',
+    hour=9,
+    minute=0,
+    id='daily_revenue_email',
+    replace_existing=True
+)
+
 
 
 @app.get("/", response_class=HTMLResponse)
