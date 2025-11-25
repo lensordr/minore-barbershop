@@ -1,10 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, create_engine
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import relationship
+from database_postgres import engine
 
-SQLALCHEMY_DATABASE_URL = "sqlite:///./barbershop.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class Barber(Base):
