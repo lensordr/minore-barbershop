@@ -295,7 +295,8 @@ async def staff_management(request: Request, db: Session = Depends(get_db)):
 
 @app.post("/admin/add-barber")
 async def add_barber(name: str = Form(...), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
-    crud.create_barber(db, name)
+    location_id = int(os.environ.get('DEFAULT_LOCATION', 1))
+    crud.create_barber(db, name, location_id)
     return RedirectResponse(url="/admin/staff", status_code=303)
 
 @app.post("/admin/delete-barber/{barber_id}")
@@ -317,7 +318,8 @@ async def add_service(
     db: Session = Depends(get_db),
     auth: bool = Depends(check_admin_auth)
 ):
-    crud.create_service(db, name, duration, price, description)
+    location_id = int(os.environ.get('DEFAULT_LOCATION', 1))
+    crud.create_service(db, name, duration, price, description, location_id)
     return RedirectResponse(url="/admin/staff", status_code=303)
 
 @app.post("/admin/edit-service/{service_id}")
