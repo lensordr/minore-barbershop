@@ -213,6 +213,11 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
             earliest_time = start_time
         else:
             earliest_time = datetime.combine(today, datetime.min.time().replace(hour=next_hour, minute=next_minute))
+        
+        # Client restriction: cannot book before 11 AM
+        min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=11, minute=0))
+        if earliest_time < min_booking_time:
+            earliest_time = min_booking_time
     
     # Get existing appointments for this barber today (exclude cancelled)
     existing_appointments = db.query(models.Appointment).filter(

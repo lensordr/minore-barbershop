@@ -66,6 +66,17 @@
 {% block scripts %}
 <script>
 function updateAvailableTimes() {
+    // Check if current time is before 11 AM
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    if (currentHour < 11) {
+        alert('Appointments are available starting 11 AM');
+        document.getElementById('appointment_time').innerHTML = '<option value="">Appointments available from 11 AM</option>';
+        document.getElementById('appointment_time').disabled = true;
+        return;
+    }
+    
     const barberId = document.getElementById('barber_id').value;
     const serviceId = document.getElementById('service_id').value;
     const timeSelect = document.getElementById('appointment_time');
