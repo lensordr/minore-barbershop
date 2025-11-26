@@ -10,6 +10,10 @@ if not DATABASE_URL:
 
 print(f"Connecting to PostgreSQL...")
 
+# Use psycopg (not psycopg2) for Python 3.13 compatibility
+if DATABASE_URL.startswith('postgresql://'):
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://', 1)
+
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
