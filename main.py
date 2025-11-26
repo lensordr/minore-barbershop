@@ -40,9 +40,7 @@ last_booking_time = 0
 
 # Auto-refresh disabled
 
-# Ensure tables exist without recreating data
-from database_postgres import engine
-models.Base.metadata.create_all(bind=engine, checkfirst=True)
+# Tables created manually - no auto-creation to preserve data
 
 # Keep-alive scheduler
 scheduler = AsyncIOScheduler()
