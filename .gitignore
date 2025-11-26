@@ -4,4 +4,5 @@ Rala/
 *.pyc
 __pycache__/
 .env
-barbershop.dbbarbershop.db
+barbershop.db
+*.db

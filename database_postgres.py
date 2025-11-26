@@ -10,32 +10,18 @@ if not DATABASE_URL:
 
 print(f"Connecting to PostgreSQL...")
 
-try:
-    engine = create_engine(
-        DATABASE_URL,
-        pool_pre_ping=True,
-        pool_recycle=1800,
-        pool_timeout=20,
-        max_overflow=0,
-        connect_args={
-            "connect_timeout": 5,
-            "application_name": "minore_barbershop"
-        }
-    )
-    # Test connection
-    with engine.connect() as conn:
-        from sqlalchemy import text
-        conn.execute(text("SELECT 1")).fetchone()
-    print("✅ PostgreSQL connected")
-except Exception as e:
-    print(f"❌ PostgreSQL failed: {e}")
-    import traceback
-    traceback.print_exc()
-    print("🔄 Using SQLite fallback")
-    engine = create_engine(
-        "sqlite:///./barbershop.db",
-        connect_args={"check_same_thread": False}
-    )
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    pool_timeout=20,
+    max_overflow=0,
+    connect_args={
+        "connect_timeout": 10,
+        "application_name": "minore_barbershop"
+    }
+)
+print("✅ Using PostgreSQL database only")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def get_db():
