@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-def create_appointment_grid(db, appointments, schedule):
+def create_appointment_grid(db, appointments, schedule, location_id=None):
     """Create a grid structure showing which time slots are occupied by appointments"""
     import crud
     
@@ -13,7 +13,10 @@ def create_appointment_grid(db, appointments, schedule):
         hours.append(f"{h:02d}:30")
     
     # Initialize grid for each barber
-    all_barbers = crud.get_barbers(db)
+    if location_id:
+        all_barbers = crud.get_active_barbers_by_location(db, location_id)
+    else:
+        all_barbers = crud.get_barbers(db)
     for barber in all_barbers:
         grid[barber.id] = {}
         for hour in hours:

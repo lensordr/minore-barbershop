@@ -40,8 +40,9 @@ last_booking_time = 0
 
 # Auto-refresh disabled
 
-# Tables will be created automatically on first connection
-# Database preserves data between deployments
+# Ensure tables exist without recreating data
+from database_postgres import engine
+models.Base.metadata.create_all(bind=engine, checkfirst=True)
 
 # Keep-alive scheduler
 scheduler = AsyncIOScheduler()
@@ -263,7 +264,7 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
     
     # Create grid data with appointment spans
     from grid_helper import create_appointment_grid
-    grid_data = create_appointment_grid(db, appointments, schedule)
+    grid_data = create_appointment_grid(db, appointments, schedule, location)
     
     location_name = "Mallorca" if location == 1 else "Concell"
     
@@ -282,15 +283,22 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
     })
 
 @app.get("/admin/staff", response_class=HTMLResponse)
-async def staff_management(request: Request, db: Session = Depends(get_db)):
-    barbers = crud.get_barbers(db)
-    services = crud.get_services(db)
+async def staff_management(request: Request, location: int = None, db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    
+    barbers = crud.get_barbers_with_revenue_by_location(db, location)
+    services = crud.get_services_by_location(db, location)
     schedule = crud.get_schedule(db)
+    location_name = "Mallorca" if location == 1 else "Concell"
+    
     return templates.TemplateResponse("staff_management.html", {
         "request": request,
         "barbers": barbers,
         "services": services,
-        "schedule": schedule
+        "schedule": schedule,
+        "location": location_name,
+        "location_id": location
     })
 
 @app.post("/admin/add-barber")

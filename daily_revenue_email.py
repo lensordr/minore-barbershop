@@ -2,9 +2,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
-from sqlalchemy.orm import sessionmaker
 import models, crud
 import os
+from database_postgres import SessionLocal
 
 def send_daily_revenue_email():
     """Send daily revenue report via email"""
@@ -25,7 +25,6 @@ def send_daily_revenue_email():
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
     
     # Get revenue data
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=models.engine)
     db = SessionLocal()
     
     try:
