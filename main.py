@@ -266,10 +266,12 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
     
     location_name = "Mallorca" if location == 1 else "Concell"
     
+    active_barbers = crud.get_active_barbers_by_location(db, location)
+    
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "appointments": appointments,
-        "barbers": crud.get_active_barbers_by_location(db, location),
+        "barbers": active_barbers,
         "all_barbers": barbers,
         "services": services,
         "schedule": schedule,

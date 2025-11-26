@@ -37,7 +37,7 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
         duration = appointment.custom_duration or appointment.service.duration
         slots_needed = (duration + 29) // 30  # Round up to nearest 30min slot
         
-        if start_time in grid[barber_id]:
+        if barber_id in grid and start_time in grid[barber_id]:
             print(f"Processing appointment {appointment.id} at {start_time}, duration {duration}min, slots_needed {slots_needed}")
             # Mark the starting slot
             grid[barber_id][start_time] = {
