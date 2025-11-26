@@ -40,13 +40,8 @@ last_booking_time = 0
 
 # Auto-refresh disabled
 
-# Create tables and ensure initial data
-models.Base.metadata.create_all(bind=models.engine)
-
-# PostgreSQL tables will be created automatically
-
-# Database is ready for manual data entry
-# No automatic data insertion
+# Tables will be created automatically on first connection
+# Database preserves data between deployments
 
 # Keep-alive scheduler
 scheduler = AsyncIOScheduler()
