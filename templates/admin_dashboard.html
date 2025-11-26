@@ -210,19 +210,34 @@ function submitQuickBooking(event) {
     const form = event.target;
     const formData = new FormData(form);
     
+    // Disable submit button to prevent double submission
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
     fetch('/admin/add-appointment', {
         method: 'POST',
         body: formData
     })
     .then(response => response.json())
     .then(data => {
-        closeQuickBooking();
         if (data.success) {
+            closeQuickBooking();
             // Immediate refresh when appointment is successfully created
             window.location.reload();
         } else {
             alert(data.message);
+            // Re-enable button on error
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating appointment');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
     });
 }
 
