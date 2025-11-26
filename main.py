@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import models, crud
-from database import get_db
+from database_postgres import get_db
 from email_service import send_appointment_email, generate_cancel_token, send_cancellation_email
 import uvicorn
 import asyncio
@@ -106,18 +106,36 @@ async def test_dashboard():
     with open("test_dashboard.html", "r") as f:
         return HTMLResponse(content=f.read())
 
-@app.get("/book", response_class=HTMLResponse)
-async def book_appointment(request: Request, db: Session = Depends(get_db)):
-    services = crud.get_services(db)
-    barbers = crud.get_active_barbers(db)
+@app.get("/mallorca/book", response_class=HTMLResponse)
+async def book_appointment_mallorca(request: Request, db: Session = Depends(get_db)):
+    services = crud.get_services_by_location(db, 1)
+    barbers = crud.get_active_barbers_by_location(db, 1)
     return templates.TemplateResponse("booking.html", {
         "request": request, 
         "services": services, 
-        "barbers": barbers
+        "barbers": barbers,
+        "location": "Mallorca",
+        "location_id": 1
     })
 
-@app.post("/book")
-async def create_appointment(
+@app.get("/concell/book", response_class=HTMLResponse)
+async def book_appointment_concell(request: Request, db: Session = Depends(get_db)):
+    services = crud.get_services_by_location(db, 2)
+    barbers = crud.get_active_barbers_by_location(db, 2)
+    return templates.TemplateResponse("booking.html", {
+        "request": request, 
+        "services": services, 
+        "barbers": barbers,
+        "location": "Concell",
+        "location_id": 2
+    })
+
+@app.get("/book", response_class=HTMLResponse)
+async def book_appointment_redirect(request: Request):
+    return RedirectResponse(url="/locations", status_code=303)
+
+@app.post("/mallorca/book")
+async def create_appointment_mallorca(
     request: Request,
     client_name: str = Form(...),
     client_email: str = Form(""),
@@ -126,6 +144,32 @@ async def create_appointment(
     barber_id: str = Form(...),
     appointment_time: str = Form(...),
     db: Session = Depends(get_db)
+):
+    return await create_appointment_helper(request, client_name, client_email, client_phone, service_id, barber_id, appointment_time, 1, db)
+
+@app.post("/concell/book")
+async def create_appointment_concell(
+    request: Request,
+    client_name: str = Form(...),
+    client_email: str = Form(""),
+    client_phone: str = Form(...),
+    service_id: int = Form(...),
+    barber_id: str = Form(...),
+    appointment_time: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    return await create_appointment_helper(request, client_name, client_email, client_phone, service_id, barber_id, appointment_time, 2, db)
+
+async def create_appointment_helper(
+    request: Request,
+    client_name: str,
+    client_email: str,
+    client_phone: str,
+    service_id: int,
+    barber_id: str,
+    appointment_time: str,
+    location_id: int,
+    db: Session
 ):
     try:
         # Handle random barber selection
@@ -166,20 +210,32 @@ async def create_appointment(
         print(f"New booking created! Updated last_booking_time to {last_booking_time}")
         # Redirect with email parameter
         email_param = "true" if client_email and client_email.strip() else "false"
-        return RedirectResponse(url=f"/success?email={email_param}", status_code=303)
+        location_path = "mallorca" if location_id == 1 else "concell"
+        return RedirectResponse(url=f"/{location_path}/success?email={email_param}", status_code=303)
     except ValueError:
-        services = crud.get_services(db)
-        barbers = crud.get_barbers(db)
+        services = crud.get_services_by_location(db, location_id)
+        barbers = crud.get_active_barbers_by_location(db, location_id)
+        location_name = "Mallorca" if location_id == 1 else "Concell"
         return templates.TemplateResponse("booking.html", {
             "request": request,
             "services": services,
             "barbers": barbers,
+            "location": location_name,
+            "location_id": location_id,
             "error": "Time slot already booked! Please select another time."
         })
 
+@app.get("/mallorca/success", response_class=HTMLResponse)
+async def success_mallorca(request: Request):
+    return templates.TemplateResponse("success.html", {"request": request, "location": "Mallorca"})
+
+@app.get("/concell/success", response_class=HTMLResponse)
+async def success_concell(request: Request):
+    return templates.TemplateResponse("success.html", {"request": request, "location": "Concell"})
+
 @app.get("/success", response_class=HTMLResponse)
-async def success(request: Request):
-    return templates.TemplateResponse("success.html", {"request": request})
+async def success_redirect(request: Request):
+    return RedirectResponse(url="/locations", status_code=303)
 
 @app.get("/admin/login", response_class=HTMLResponse)
 async def admin_login(request: Request):
@@ -196,28 +252,32 @@ async def admin_login_post(username: str = Form(...), password: str = Form(...))
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(request: Request, db: Session = Depends(get_db)):
-    print(f"Dashboard accessed at {datetime.now()}")
-    appointments = crud.get_today_appointments_ordered(db)
-    barbers = crud.get_barbers_with_revenue(db)
-    services = crud.get_services(db)
+async def admin_dashboard(request: Request, location: int = 1, db: Session = Depends(get_db)):
+    print(f"Dashboard accessed at {datetime.now()} for location {location}")
+    appointments = crud.get_today_appointments_ordered_by_location(db, location)
+    barbers = crud.get_barbers_with_revenue_by_location(db, location)
+    services = crud.get_services_by_location(db, location)
     schedule = crud.get_schedule(db)
-    counts = crud.get_today_appointment_counts(db)
+    counts = crud.get_today_appointment_counts_by_location(db, location)
     
     # Create grid data with appointment spans
     from grid_helper import create_appointment_grid
     grid_data = create_appointment_grid(db, appointments, schedule)
     
+    location_name = "Mallorca" if location == 1 else "Concell"
+    
     return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "appointments": appointments,
-        "barbers": crud.get_active_barbers(db),
+        "barbers": crud.get_active_barbers_by_location(db, location),
         "all_barbers": barbers,
         "services": services,
         "schedule": schedule,
         "counts": counts,
         "grid_data": grid_data,
-        "now": datetime.now()
+        "now": datetime.now(),
+        "location": location_name,
+        "location_id": location
     })
 
 @app.get("/admin/staff", response_class=HTMLResponse)
@@ -407,69 +467,4 @@ async def get_available_times(barber_id: int, service_id: int, db: Session = Dep
 async def cancel_appointment_by_token(request: Request, cancel_token: str, db: Session = Depends(get_db)):
     appointment = db.query(models.Appointment).filter(
         models.Appointment.cancel_token == cancel_token,
-        models.Appointment.status == "scheduled"
-    ).first()
-    
-    return templates.TemplateResponse("cancel_appointment.html", {
-        "request": request,
-        "appointment": appointment,
-        "cancel_token": cancel_token
-    })
-
-@app.post("/cancel-appointment/{cancel_token}/confirm")
-async def confirm_cancel_appointment(request: Request, cancel_token: str, db: Session = Depends(get_db)):
-    appointment = db.query(models.Appointment).filter(
-        models.Appointment.cancel_token == cancel_token,
-        models.Appointment.status == "scheduled"
-    ).first()
-    
-    if appointment:
-        appointment.status = "cancelled"
-        db.commit()
-        
-        # Trigger dashboard refresh
-        global last_booking_time
-        import time
-        last_booking_time = time.time()
-        print(f"Appointment cancelled! Updated last_booking_time to {last_booking_time}")
-        
-        # Send cancellation email async
-        import threading
-        def send_cancel_email_async():
-            try:
-                send_cancellation_email(appointment.email, appointment.client_name, appointment.appointment_time, appointment.service.name)
-                print(f"Cancellation email sent to {appointment.email}")
-            except Exception as e:
-                print(f"Cancellation email error: {e}")
-        
-        threading.Thread(target=send_cancel_email_async, daemon=True).start()
-        
-        return templates.TemplateResponse("cancel_success.html", {"request": request})
-    else:
-        return templates.TemplateResponse("cancel_appointment.html", {
-            "request": request,
-            "appointment": None,
-            "cancel_token": cancel_token
-        })
-
-@app.get("/api/check-refresh")
-async def check_refresh(last_check: float = 0):
-    global last_booking_time
-    refresh_needed = last_booking_time > last_check
-    print(f"Refresh check: last_booking={last_booking_time}, last_check={last_check}, refresh_needed={refresh_needed}")
-    return {"refresh_needed": refresh_needed, "timestamp": last_booking_time}
-
-@app.get("/export-data")
-async def export_data(db: Session = Depends(get_db)):
-    barbers = db.query(models.Barber).all()
-    services = db.query(models.Service).all()
-    
-    return {
-        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
-        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
-    }
-
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+        m

@@ -11,6 +11,7 @@ class Barber(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     active = Column(Integer, default=1)  # 1=active, 0=closed
+    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
     appointments = relationship("Appointment", back_populates="barber")
 
@@ -22,6 +23,7 @@ class Service(Base):
     description = Column(String)
     duration = Column(Integer)  # minutes
     price = Column(Float)
+    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
     appointments = relationship("Appointment", back_populates="service")
 
@@ -40,6 +42,7 @@ class Appointment(Base):
     is_random = Column(Integer, default=0)  # 1 if randomly assigned
     email = Column(String, default="")
     cancel_token = Column(String, default="")
+    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
     barber = relationship("Barber", back_populates="appointments")
     service = relationship("Service", back_populates="appointments")
@@ -67,6 +70,7 @@ class MonthlyRevenue(Base):
     month = Column(Integer)
     revenue = Column(Float, default=0.0)
     appointments_count = Column(Integer, default=0)
+    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
     barber = relationship("Barber")
 
@@ -78,5 +82,6 @@ class DailyRevenue(Base):
     date = Column(String)  # YYYY-MM-DD format
     revenue = Column(Float, default=0.0)
     appointments_count = Column(Integer, default=0)
+    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
     barber = relationship("Barber")

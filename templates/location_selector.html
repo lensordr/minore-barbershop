@@ -1,26 +1,108 @@
-{% extends "base.html" %}
-
-{% block title %}Choose Location - MINORE BARBER{% endblock %}
-
-{% block content %}
-<div class="location-selector">
-    <h2>Choose Your Location</h2>
-    <p>Select the MINORE BARBER location where you'd like to book your appointment</p>
-    
-    <div class="locations-grid">
-        <a href="https://minore-barbershop.onrender.com/book" class="location-card">
-            <div class="location-icon">📍</div>
-            <h3>Minore Barber Mallorca</h3>
-            <p>Carrer de Mallorca, 233<br>Barcelona</p>
-            <div class="book-btn">Book Now</div>
-        </a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MINORE BARBERSHOP - Select Location</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .location-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+        }
         
-        <a href="https://minorebarbeconcell.onrender.com/book" class="location-card">
-            <div class="location-icon">📍</div>
-            <h3>Minore Barber Consell de Cent</h3>
-            <p>Carrer del Consell de Cent, 250<br>Barcelona</p>
-            <div class="book-btn">Book Now</div>
-        </a>
+        .location-title {
+            font-size: 2.5rem;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 300;
+        }
+        
+        .location-subtitle {
+            color: #7f8c8d;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        
+        .location-buttons {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .location-btn {
+            display: block;
+            padding: 30px 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 200px;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+        }
+        
+        .location-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .location-btn.concell {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            box-shadow: 0 5px 15px rgba(240, 147, 251, 0.3);
+        }
+        
+        .location-btn.concell:hover {
+            box-shadow: 0 8px 25px rgba(240, 147, 251, 0.4);
+        }
+        
+        .location-info {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #ecf0f1;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .location-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .location-btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="location-container">
+        <h1 class="location-title">MINORE BARBERSHOP</h1>
+        <p class="location-subtitle">Choose your preferred location to book an appointment</p>
+        
+        <div class="location-buttons">
+            <a href="/mallorca/book" class="location-btn mallorca">
+                📍 MALLORCA
+            </a>
+            <a href="/concell/book" class="location-btn concell">
+                📍 CONCELL
+            </a>
+        </div>
+        
+        <div class="location-info">
+            <p>Both locations offer professional barbering services with experienced staff</p>
+            <p>Same-day appointments available • Walk-ins welcome</p>
+        </div>
     </div>
-</div>
-{% endblock %}
+</body>
+</html>

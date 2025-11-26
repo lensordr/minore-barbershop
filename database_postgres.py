@@ -2,11 +2,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 
-# Use Render PostgreSQL or fallback to Supabase
+# Use Render PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
-    DB_PASSWORD = os.environ.get('DB_PASSWORD', 'Minorebarber2025!')
-    DATABASE_URL = f"postgresql+psycopg://postgres.jljpkwssshgpwqhahtyj:{DB_PASSWORD}@aws-1-eu-central-1.pooler.supabase.com:5432/postgres"
+    # Render PostgreSQL URL
+    DATABASE_URL = "postgresql://minore_barbershop_production_user:wpxw9iKAdGi4BFyXabqHYl9hSxkdwEYB@dpg-d4jijreuk2gs73bm33vg-a.frankfurt-postgres.render.com/minore_barbershop_production"
 
 print(f"Connecting to PostgreSQL...")
 
@@ -24,10 +24,13 @@ try:
     )
     # Test connection
     with engine.connect() as conn:
-        conn.execute("SELECT 1")
+        from sqlalchemy import text
+        conn.execute(text("SELECT 1")).fetchone()
     print("✅ PostgreSQL connected")
 except Exception as e:
     print(f"❌ PostgreSQL failed: {e}")
+    import traceback
+    traceback.print_exc()
     print("🔄 Using SQLite fallback")
     engine = create_engine(
         "sqlite:///./barbershop.db",

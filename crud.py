@@ -8,8 +8,17 @@ def get_barbers(db: Session):
 def get_active_barbers(db: Session):
     return db.query(models.Barber).filter(models.Barber.active == 1).all()
 
+def get_active_barbers_by_location(db: Session, location_id: int):
+    return db.query(models.Barber).filter(
+        models.Barber.active == 1,
+        models.Barber.location_id == location_id
+    ).all()
+
 def get_services(db: Session):
     return db.query(models.Service).all()
+
+def get_services_by_location(db: Session, location_id: int):
+    return db.query(models.Service).filter(models.Service.location_id == location_id).all()
 
 def get_service_by_id(db: Session, service_id: int):
     return db.query(models.Service).filter(models.Service.id == service_id).first()
@@ -17,15 +26,15 @@ def get_service_by_id(db: Session, service_id: int):
 def get_barber_by_id(db: Session, barber_id: int):
     return db.query(models.Barber).filter(models.Barber.id == barber_id).first()
 
-def create_barber(db: Session, name: str):
-    barber = models.Barber(name=name)
+def create_barber(db: Session, name: str, location_id: int = 1):
+    barber = models.Barber(name=name, location_id=location_id)
     db.add(barber)
     db.commit()
     db.refresh(barber)
     return barber
 
-def create_service(db: Session, name: str, duration: int, price: float, description: str = ""):
-    service = models.Service(name=name, duration=duration, price=price, description=description)
+def create_service(db: Session, name: str, duration: int, price: float, description: str = "", location_id: int = 1):
+    service = models.Service(name=name, duration=duration, price=price, description=description, location_id=location_id)
     db.add(service)
     db.commit()
     db.refresh(service)
@@ -154,6 +163,15 @@ def get_today_appointments_ordered(db: Session):
         models.Appointment.status != "cancelled"
     ).order_by(models.Appointment.appointment_time).all()
 
+def get_today_appointments_ordered_by_location(db: Session, location_id: int):
+    today = datetime.now().date()
+    return db.query(models.Appointment).join(models.Barber).filter(
+        models.Appointment.appointment_time >= today,
+        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.status != "cancelled",
+        models.Barber.location_id == location_id
+    ).order_by(models.Appointment.appointment_time).all()
+
 def get_today_appointment_counts(db: Session):
     today = datetime.now().date()
     total = db.query(models.Appointment).filter(
@@ -171,6 +189,30 @@ def get_today_appointment_counts(db: Session):
         models.Appointment.appointment_time >= today,
         models.Appointment.appointment_time < today + timedelta(days=1),
         models.Appointment.status == "cancelled"
+    ).count()
+    
+    return {"total": total, "completed": completed, "cancelled": cancelled}
+
+def get_today_appointment_counts_by_location(db: Session, location_id: int):
+    today = datetime.now().date()
+    total = db.query(models.Appointment).join(models.Barber).filter(
+        models.Appointment.appointment_time >= today,
+        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Barber.location_id == location_id
+    ).count()
+    
+    completed = db.query(models.Appointment).join(models.Barber).filter(
+        models.Appointment.appointment_time >= today,
+        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.status == "completed",
+        models.Barber.location_id == location_id
+    ).count()
+    
+    cancelled = db.query(models.Appointment).join(models.Barber).filter(
+        models.Appointment.appointment_time >= today,
+        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.status == "cancelled",
+        models.Barber.location_id == location_id
     ).count()
     
     return {"total": total, "completed": completed, "cancelled": cancelled}
@@ -269,6 +311,33 @@ def get_barber_revenue(db: Session, barber_id: int, date: datetime.date = None):
 
 def get_barbers_with_revenue(db: Session):
     barbers = get_barbers(db)
+    today = datetime.now().date()
+    
+    for barber in barbers:
+        # Get today's completed appointments
+        completed_appointments = db.query(models.Appointment).filter(
+            models.Appointment.barber_id == barber.id,
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "completed"
+        ).all()
+        
+        barber.today_revenue = sum(apt.custom_price or apt.service.price for apt in completed_appointments)
+        barber.today_appointments = len(completed_appointments)
+        
+        # Get total scheduled appointments for today
+        total_today = db.query(models.Appointment).filter(
+            models.Appointment.barber_id == barber.id,
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1)
+        ).count()
+        
+        barber.total_today_appointments = total_today
+    
+    return barbers
+
+def get_barbers_with_revenue_by_location(db: Session, location_id: int):
+    barbers = db.query(models.Barber).filter(models.Barber.location_id == location_id).all()
     today = datetime.now().date()
     
     for barber in barbers:
