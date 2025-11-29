@@ -12,7 +12,13 @@ load_dotenv()
 def generate_cancel_token():
     return secrets.token_urlsafe(32)
 
-def send_appointment_email(client_email, client_name, appointment_time, service_name, barber_name, cancel_token):
+def get_location_address(location_name):
+    if location_name and location_name.upper() == 'CONCELL':
+        return 'Consell de Cent 250'
+    else:
+        return 'Carrer de Mallorca 233'
+
+def send_appointment_email(client_email, client_name, appointment_time, service_name, barber_name, cancel_token, location_name=None):
     try:
         cancel_url = f"{os.getenv('BASE_URL', 'http://localhost:8000')}/cancel-appointment/{cancel_token}"
         
@@ -27,8 +33,8 @@ Your appointment has been confirmed at MINORE BARBER!
 • Date & Time: {appointment_time.strftime('%A, %B %d, %Y at %I:%M %p')}
 
 📍 LOCATION:
-MINORE BARBER
-Calle Mallorca 233
+MINORE BARBER - {location_name or 'MALLORCA'}
+{get_location_address(location_name)}
 
 ❌ NEED TO CANCEL?
 Click here to cancel: {cancel_url}
