@@ -1639,43 +1639,44 @@ main {
         animation-duration: 0.3s;
     }
 }
-/* Barber Photo Grid */
+/* Barber Photo List */
 .barber-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
     gap: 0.75rem;
     margin-top: 0.5rem;
-    max-height: 300px;
-    overflow-y: auto;
+    overflow-x: auto;
+    padding: 0.5rem 0;
+    -webkit-overflow-scrolling: touch;
 }
 
 .barber-option {
     text-align: center;
     cursor: pointer;
-    padding: 0.75rem;
-    border-radius: 10px;
+    padding: 0.5rem;
+    border-radius: 8px;
     border: 2px solid transparent;
     transition: all 0.3s ease;
     background: #1d1a1c;
+    min-width: 80px;
+    flex-shrink: 0;
 }
 
 .barber-option:hover {
     border-color: #fbcc93;
-    transform: scale(1.02);
-    box-shadow: 0 2px 10px rgba(251, 204, 147, 0.2);
+    transform: scale(1.05);
 }
 
 .barber-option.selected {
     border-color: #fbcc93;
     background: rgba(251, 204, 147, 0.1);
-    box-shadow: 0 0 15px rgba(251, 204, 147, 0.3);
+    box-shadow: 0 0 10px rgba(251, 204, 147, 0.3);
 }
 
 .barber-photo {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
-    margin: 0 auto 0.4rem;
+    margin: 0 auto 0.3rem;
     overflow: hidden;
     border: 2px solid #333;
     transition: border-color 0.3s ease;
@@ -1696,14 +1697,17 @@ main {
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
+    font-size: 1.2rem;
 }
 
 .barber-name {
     font-weight: 600;
     color: #fbcc93;
-    font-size: 0.75rem;
-    line-height: 1.2;
+    font-size: 0.7rem;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .barber-option.selected .barber-name {
@@ -1743,26 +1747,22 @@ main {
     }
     
     .barber-grid {
-        grid-template-columns: repeat(3, 1fr);
         gap: 0.5rem;
-        margin-top: 0.75rem;
-        max-height: 250px;
+        padding: 0.25rem 0;
     }
     
     .barber-option {
-        padding: 0.5rem;
-        border-radius: 8px;
+        padding: 0.4rem;
+        min-width: 70px;
     }
     
     .barber-photo {
-        width: 50px;
-        height: 50px;
-        margin-bottom: 0.3rem;
+        width: 40px;
+        height: 40px;
     }
     
     .barber-name {
-        font-size: 0.7rem;
-        font-weight: 600;
+        font-size: 0.65rem;
     }
     
     .btn {
@@ -1789,21 +1789,20 @@ main {
     }
     
     .barber-grid {
-        grid-template-columns: repeat(3, 1fr);
         gap: 0.4rem;
-        max-height: 200px;
     }
     
     .barber-option {
-        padding: 0.4rem;
+        padding: 0.3rem;
+        min-width: 60px;
     }
     
     .barber-photo {
-        width: 45px;
-        height: 45px;
+        width: 35px;
+        height: 35px;
     }
     
     .barber-name {
-        font-size: 0.65rem;
+        font-size: 0.6rem;
     }
 }
