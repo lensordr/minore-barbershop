@@ -588,4 +588,16 @@ async def export_data(db: Session = Depends(get_db)):
     
     return {
         "barbers": [{"name": b.name, "active": b.active} for b in barbers],
-        "services
+        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
+    }
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
+    }
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
