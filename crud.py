@@ -622,31 +622,4 @@ def get_weekly_revenue(db: Session, date: str = None, location_id: int = None):
         models.DailyRevenue.date <= end_of_week.strftime('%Y-%m-%d')
     )
     
-    if location_id:
-        query = query.join(models.Barber).filter(models.Barber.location_id == location_id)
-    
-    records = query.all()
-    
-    # Group by barber
-    barber_totals = {}
-    for record in records:
-        if record.barber_id not in barber_totals:
-            barber_totals[record.barber_id] = {
-                "barber": record.barber,
-                "revenue": 0,
-                "appointments_count": 0
-            }
-        barber_totals[record.barber_id]["revenue"] += record.revenue
-        barber_totals[record.barber_id]["appointments_count"] += record.appointments_count
-    
-    weekly_records = list(barber_totals.values())
-    total_revenue = sum(r["revenue"] for r in weekly_records)
-    total_appointments = sum(r["appointments_count"] for r in weekly_records)
-    
-    return {
-        "records": weekly_records,
-        "total_revenue": total_revenue,
-        "total_appointments": total_appointments,
-        "week_start": start_of_week.strftime('%Y-%m-%d'),
-        "week_end": end_of_week.strftime('%Y-%m-%d')
-    }
+    if 
