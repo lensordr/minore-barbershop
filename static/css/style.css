@@ -1639,60 +1639,61 @@ main {
         animation-duration: 0.3s;
     }
 }
-/* Barber Photo List */
-.barber-grid {
+/* Barber List */
+.barber-list {
     display: flex;
-    gap: 0.75rem;
-    margin-top: 0.5rem;
-    overflow-x: auto;
-    padding: 0.5rem 0;
-    -webkit-overflow-scrolling: touch;
-}
-
-.barber-option {
-    text-align: center;
-    cursor: pointer;
-    padding: 0.3rem;
-    border-radius: 6px;
-    border: 1px solid transparent;
-    transition: all 0.3s ease;
-    background: #1d1a1c;
-    min-width: 60px;
-    flex-shrink: 0;
-}
-
-.barber-option:hover {
-    border-color: #fbcc93;
-    transform: scale(1.05);
-}
-
-.barber-option.selected {
-    border-color: #fbcc93;
-    background: rgba(251, 204, 147, 0.1);
-    box-shadow: 0 0 10px rgba(251, 204, 147, 0.3);
-}
-
-.barber-photo {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    margin: 0 auto 0.2rem;
-    overflow: hidden;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-height: 300px;
+    overflow-y: auto;
     border: 1px solid #333;
-    transition: border-color 0.3s ease;
+    border-radius: 8px;
+    background: #1d1a1c;
 }
 
-.barber-option.selected .barber-photo {
+.barber-item {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-bottom: 1px solid #333;
+}
+
+.barber-item:last-child {
+    border-bottom: none;
+}
+
+.barber-item:hover {
+    background: rgba(251, 204, 147, 0.1);
+}
+
+.barber-item.selected {
+    background: rgba(251, 204, 147, 0.2);
+    border-left: 3px solid #fbcc93;
+}
+
+.barber-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+    border: 2px solid #333;
+}
+
+.barber-item.selected .barber-avatar {
     border-color: #fbcc93;
 }
 
-.barber-photo img {
+.barber-avatar img {
     width: 100%;
     height: 100%;
     object-fit: cover;
 }
 
-.barber-photo.random-barber {
+.random-avatar {
     background: linear-gradient(45deg, #fbcc93, #f4b876);
     display: flex;
     align-items: center;
@@ -1700,18 +1701,45 @@ main {
     font-size: 1.2rem;
 }
 
+.barber-info {
+    flex: 1;
+}
+
 .barber-name {
     font-weight: 600;
     color: #fbcc93;
-    font-size: 0.6rem;
-    line-height: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-size: 0.9rem;
+    margin-bottom: 0.2rem;
 }
 
-.barber-option.selected .barber-name {
+.barber-desc {
+    font-size: 0.75rem;
     color: #fbcc93;
+    opacity: 0.7;
+}
+
+.barber-check {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #333;
+    border-radius: 50%;
+    position: relative;
+}
+
+.barber-item.selected .barber-check {
+    background: #fbcc93;
+    border-color: #fbcc93;
+}
+
+.barber-item.selected .barber-check::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #1d1a1c;
+    font-size: 0.8rem;
+    font-weight: bold;
 }
 
 /* Mobile adjustments */
@@ -1746,23 +1774,16 @@ main {
         border-radius: 8px;
     }
     
-    .barber-grid {
-        gap: 0.5rem;
-        padding: 0.25rem 0;
+    .barber-select-wrapper {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
     }
     
-    .barber-option {
-        padding: 0.4rem;
-        min-width: 70px;
-    }
-    
-    .barber-photo {
-        width: 25px;
-        height: 25px;
-    }
-    
-    .barber-name {
-        font-size: 0.55rem;
+    .selected-barber-photo {
+        width: 60px;
+        height: 60px;
+        align-self: center;
     }
     
     .btn {
@@ -1788,21 +1809,8 @@ main {
         margin: 0.5rem;
     }
     
-    .barber-grid {
-        gap: 0.4rem;
-    }
-    
-    .barber-option {
-        padding: 0.3rem;
-        min-width: 60px;
-    }
-    
-    .barber-photo {
-        width: 22px;
-        height: 22px;
-    }
-    
-    .barber-name {
-        font-size: 0.5rem;
+    .selected-barber-photo {
+        width: 50px;
+        height: 50px;
     }
 }
