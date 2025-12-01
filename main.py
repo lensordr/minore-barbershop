@@ -15,7 +15,6 @@ import json
 from sse_starlette.sse import EventSourceResponse
 from contextlib import asynccontextmanager
 import io
-import pandas as pd
 
 def check_admin_auth(request: Request, admin_logged_in: str = Cookie(None)):
     if admin_logged_in != "true":
@@ -509,53 +508,7 @@ async def revenue_logout():
     response.delete_cookie("revenue_logged_in")
     return response
 
-@app.get("/admin/export-revenue")
-async def export_revenue(view: str = "monthly", date: str = None, location: int = None, db: Session = Depends(get_db)):
-    if location is None:
-        location = int(os.environ.get('DEFAULT_LOCATION', 1))
-    
-    location_name = "Mallorca" if location == 1 else "Concell"
-    
-    if view == "monthly":
-        revenue_data = crud.get_monthly_revenue(db, location_id=location)
-        filename = f"Monthly_Revenue_{location_name}_{datetime.now().strftime('%Y_%m')}.xlsx"
-    elif view == "weekly":
-        revenue_data = crud.get_weekly_revenue(db, date, location)
-        filename = f"Weekly_Revenue_{location_name}_{date or datetime.now().strftime('%Y_%m_%d')}.xlsx"
-    else:
-        revenue_data = crud.get_daily_revenue(db, date, location)
-        filename = f"Daily_Revenue_{location_name}_{date or datetime.now().strftime('%Y_%m_%d')}.xlsx"
-    
-    # Create DataFrame
-    data = []
-    for record in revenue_data['records']:
-        data.append({
-            'Barber': record.barber.name,
-            'Revenue (€)': record.revenue,
-            'Appointments': record.appointments_count
-        })
-    
-    # Add total row
-    data.append({
-        'Barber': 'TOTAL',
-        'Revenue (€)': revenue_data['total_revenue'],
-        'Appointments': revenue_data['total_appointments']
-    })
-    
-    df = pd.DataFrame(data)
-    
-    # Create Excel file in memory
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Revenue Report')
-    
-    output.seek(0)
-    
-    return StreamingResponse(
-        io.BytesIO(output.read()),
-        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
-    )
+# Excel export temporarily disabled for deployment compatibility
 
 @app.get("/admin/logout")
 async def admin_logout():
