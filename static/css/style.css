@@ -402,6 +402,10 @@ main {
     color: white !important;
 }
 
+.appointment-completed .client-name {
+    color: white !important;
+}
+
 .appointment-scheduled {
     background: #f8d7da !important;
     border-left: 3px solid #dc3545 !important;
@@ -418,6 +422,10 @@ main {
     font-size: 0.9rem;
     margin-bottom: 0.25rem;
     color: #1a1a1a;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .service-code {
@@ -1148,6 +1156,24 @@ main {
         margin-top: 1rem;
         border-top: 1px solid #444;
     }
+    
+    /* Limit client name display on tablets */
+    .client-name {
+        font-size: 0.75rem;
+        line-height: 1.1;
+        max-height: 2.2em;
+        overflow: hidden;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+    }
+    
+    .appointment-item {
+        padding: 0.4rem;
+        min-height: 50px;
+        max-height: 56px;
+        overflow: hidden;
+    }
 }
 
 /* Mobile Responsive */
@@ -1337,6 +1363,17 @@ main {
 
 .appointment-online .service-name {
     color: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Status overrides - must come after online/random styles */
+.appointment-item.appointment-completed {
+    background: #155724 !important;
+    border-left: 3px solid #0d4419 !important;
+    color: white !important;
+}
+
+.appointment-item.appointment-completed .client-name {
+    color: white !important;
 }
 
 /* Location Selector */

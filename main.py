@@ -304,7 +304,7 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
     
     active_barbers = crud.get_active_barbers_by_location(db, location)
     
-    return templates.TemplateResponse("admin_dashboard.html", {
+    response = templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "appointments": appointments,
         "barbers": active_barbers,
@@ -317,6 +317,10 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
         "location": location_name,
         "location_id": location
     })
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 @app.get("/admin/staff", response_class=HTMLResponse)
 async def staff_management(request: Request, location: int = None, db: Session = Depends(get_db)):
@@ -399,18 +403,25 @@ async def cancel_appointment(appointment_id: int, db: Session = Depends(get_db))
     crud.cancel_appointment(db, appointment_id)
     return RedirectResponse(url="/admin/dashboard", status_code=303)
 
+@app.post("/admin/reopen/{appointment_id}")
+async def reopen_appointment(appointment_id: int, db: Session = Depends(get_db)):
+    crud.reopen_appointment(db, appointment_id)
+    return RedirectResponse(url="/admin/dashboard", status_code=303)
+
 
 
 @app.post("/admin/edit-appointment")
 async def edit_appointment(
     appointment_id: int = Form(...),
+    client_name: str = Form(...),
+    barber_id: int = Form(...),
     time: str = Form(...),
     price: float = Form(...),
     duration: int = Form(...),
     db: Session = Depends(get_db)
 ):
     try:
-        crud.update_appointment_details(db, appointment_id, time, price, duration)
+        crud.update_appointment_details(db, appointment_id, client_name, barber_id, time, price, duration)
         return {"success": True, "message": "Appointment updated successfully"}
     except ValueError as e:
         return {"success": False, "message": str(e)}

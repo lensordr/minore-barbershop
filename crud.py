@@ -432,7 +432,45 @@ def cancel_appointment(db: Session, appointment_id: int):
         db.refresh(appointment)
     return appointment
 
-def update_appointment_details(db: Session, appointment_id: int, time: str, price: float, duration: int):
+def reopen_appointment(db: Session, appointment_id: int):
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if appointment and appointment.status == "completed":
+        appointment.status = "scheduled"
+        
+        # Remove from revenue records
+        today = appointment.appointment_time.date()
+        
+        # Remove from daily revenue
+        date_str = today.strftime('%Y-%m-%d')
+        daily_record = db.query(models.DailyRevenue).filter(
+            models.DailyRevenue.barber_id == appointment.barber_id,
+            models.DailyRevenue.date == date_str
+        ).first()
+        
+        if daily_record:
+            daily_record.revenue -= appointment.custom_price or appointment.service.price
+            daily_record.appointments_count -= 1
+            if daily_record.appointments_count <= 0:
+                db.delete(daily_record)
+        
+        # Remove from monthly revenue
+        monthly_record = db.query(models.MonthlyRevenue).filter(
+            models.MonthlyRevenue.barber_id == appointment.barber_id,
+            models.MonthlyRevenue.year == today.year,
+            models.MonthlyRevenue.month == today.month
+        ).first()
+        
+        if monthly_record:
+            monthly_record.revenue -= appointment.custom_price or appointment.service.price
+            monthly_record.appointments_count -= 1
+            if monthly_record.appointments_count <= 0:
+                db.delete(monthly_record)
+        
+        db.commit()
+        db.refresh(appointment)
+    return appointment
+
+def update_appointment_details(db: Session, appointment_id: int, client_name: str, barber_id: int, time: str, price: float, duration: int):
     appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
     if not appointment:
         raise ValueError("Appointment not found")
@@ -442,21 +480,21 @@ def update_appointment_details(db: Session, appointment_id: int, time: str, pric
     new_time = datetime.strptime(time, "%H:%M").time()
     new_datetime = datetime.combine(current_date, new_time)
     
-    # Check if new time slot is available (exclude current appointment)
+    # Check if new time slot is available with new barber (exclude current appointment)
     existing = db.query(models.Appointment).filter(
-        models.Appointment.barber_id == appointment.barber_id,
+        models.Appointment.barber_id == barber_id,
         models.Appointment.appointment_time == new_datetime,
         models.Appointment.status != "cancelled",
         models.Appointment.id != appointment_id
     ).first()
     
     if existing:
-        raise ValueError("Time slot already booked")
+        raise ValueError("Time slot already booked for selected barber")
     
     # Update appointment
+    appointment.client_name = client_name
+    appointment.barber_id = barber_id
     appointment.appointment_time = new_datetime
-    
-    # Update appointment-specific price and duration
     appointment.custom_price = price
     appointment.custom_duration = duration
     

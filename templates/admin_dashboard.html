@@ -48,8 +48,8 @@
                 {% if slot.type == "appointment" %}
                     {% set appointment = slot.appointment %}
                     {% set duration = appointment.custom_duration or appointment.service.duration %}
-                    <div class="appointment-item appointment-{{ appointment.status }}{% if appointment.is_random %} appointment-random{% elif appointment.is_online %} appointment-online{% endif %}" 
-                         onclick="editAppointment({{ appointment.id }}, '{{ appointment.client_name|replace("'", "\\'") }}', '{{ appointment.service.name|replace("'", "\\'") }}', {{ appointment.custom_price or appointment.service.price }}, {{ duration }}, '{{ appointment.appointment_time.strftime('%H:%M') }}', '{{ appointment.status }}')" 
+                    <div class="appointment-item appointment-{{ appointment.status }}{% if appointment.status == 'scheduled' %}{% if appointment.is_random %} appointment-random{% elif appointment.is_online %} appointment-online{% endif %}{% endif %}" 
+                         onclick="editAppointment({{ appointment.id }}, '{{ appointment.client_name|replace("'", "\\'") }}', '{{ appointment.service.name|replace("'", "\\'") }}', {{ appointment.custom_price or appointment.service.price }}, {{ duration }}, '{{ appointment.appointment_time.strftime('%H:%M') }}', '{{ appointment.status }}', {{ appointment.barber_id }})" 
                          style="cursor: pointer; height: {{ slot.span_rows * 60 - 4 }}px; margin-bottom: -{{ (slot.span_rows - 1) * 60 }}px; z-index: 10; position: relative;">
                         <div class="client-name">{{ appointment.client_name }}{% if appointment.is_random %} 🎲{% endif %}</div>
                         <div class="service-code">
@@ -143,12 +143,20 @@
         </div>
         <form id="editAppointmentForm" onsubmit="submitEditAppointment(event)">
             <div class="form-group">
-                <label>Client:</label>
-                <span id="editClientName"></span>
+                <label for="editClientName">Client Name:</label>
+                <input type="text" id="editClientName" name="client_name" required>
             </div>
             <div class="form-group">
                 <label>Service:</label>
                 <span id="editServiceName"></span>
+            </div>
+            <div class="form-group">
+                <label for="editBarber">Barber:</label>
+                <select id="editBarber" name="barber_id" required>
+                    {% for barber in barbers %}
+                    <option value="{{ barber.id }}">{{ barber.name }}</option>
+                    {% endfor %}
+                </select>
             </div>
             <div class="form-group">
                 <label for="editTime">Time:</label>
@@ -167,6 +175,9 @@
                 <div id="appointmentActions" style="display: flex; gap: 0.5rem;">
                     <button type="button" onclick="completeAppointment()" class="btn btn-primary" style="padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">Complete & Checkout</button>
                     <button type="button" onclick="cancelAppointment()" class="btn btn-cancel" style="padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">Cancel Appointment</button>
+                </div>
+                <div id="completedActions" style="display: none; gap: 0.5rem;">
+                    <button type="button" onclick="reopenAppointment()" class="btn" style="background: #ff9800; color: white; padding: 0.6rem 1rem; font-size: 1rem; width: 100%;">Reopen Appointment</button>
                 </div>
                 <button type="button" onclick="closeEditAppointment()" class="btn btn-secondary">Close</button>
             </div>
@@ -242,20 +253,27 @@ function submitQuickBooking(event) {
 }
 
 // Edit appointment functions
-function editAppointment(id, clientName, serviceName, price, duration, time, status) {
+function editAppointment(id, clientName, serviceName, price, duration, time, status, barberId) {
     document.getElementById('editAppointmentId').value = id;
-    document.getElementById('editClientName').textContent = clientName;
+    document.getElementById('editClientName').value = clientName;
     document.getElementById('editServiceName').textContent = serviceName;
     document.getElementById('editTime').value = time;
     document.getElementById('editPrice').value = price;
     document.getElementById('editDuration').value = duration;
+    document.getElementById('editBarber').value = barberId;
     
     // Show/hide action buttons based on status
     const actionButtons = document.getElementById('appointmentActions');
+    const completedButtons = document.getElementById('completedActions');
     if (status === 'scheduled') {
-        actionButtons.style.display = 'block';
+        actionButtons.style.display = 'flex';
+        completedButtons.style.display = 'none';
+    } else if (status === 'completed') {
+        actionButtons.style.display = 'none';
+        completedButtons.style.display = 'flex';
     } else {
         actionButtons.style.display = 'none';
+        completedButtons.style.display = 'none';
     }
     
     document.getElementById('editAppointmentModal').style.display = 'block';
@@ -325,6 +343,20 @@ function cancelAppointment() {
         .then(() => {
             closeEditAppointment();
             window.location.reload();
+        });
+    }
+}
+
+function reopenAppointment() {
+    if (confirm('Reopen this completed appointment? This will remove it from revenue.')) {
+        const appointmentId = document.getElementById('editAppointmentId').value;
+        
+        fetch(`/admin/reopen/${appointmentId}`, {
+            method: 'POST'
+        })
+        .then(() => {
+            closeEditAppointment();
+            window.location.href = window.location.href;
         });
     }
 }

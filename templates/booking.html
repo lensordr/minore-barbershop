@@ -106,36 +106,50 @@ function updateAvailableTimes() {
         timeSelect.disabled = true;
         
         if (barberId === 'random') {
-            // For random selection, get times from first active barber as reference
+            // For random selection, get all available times from all barbers
             const barberItems = document.querySelectorAll('.barber-item[data-barber-id]:not([data-barber-id="random"])');
             if (barberItems.length === 0) return;
-            const firstBarberId = barberItems[0].getAttribute('data-barber-id');
-            fetch(`/api/available-times/${firstBarberId}/${serviceId}?t=${Date.now()}`)
-                .then(response => response.json())
-                .then(times => {
-                    timeSelect.innerHTML = '<option value="">Select a time</option>';
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const currentMinute = now.getMinutes();
-                    
-                    times.forEach(time => {
-                        const [hour, minute] = time.split(':').map(Number);
-                        const timeInMinutes = hour * 60 + minute;
-                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
+            
+            const allTimes = new Set();
+            let completedRequests = 0;
+            
+            barberItems.forEach(item => {
+                const barberId = item.getAttribute('data-barber-id');
+                fetch(`/api/available-times/${barberId}/${serviceId}?t=${Date.now()}`)
+                    .then(response => response.json())
+                    .then(times => {
+                        times.forEach(time => allTimes.add(time));
+                        completedRequests++;
                         
-                        // Only show times that are in the future
-                        if (timeInMinutes > currentTimeInMinutes) {
-                            const today = new Date().toISOString().split('T')[0];
-                            const datetime = `${today}T${time}:00`;
-                            timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
+                        if (completedRequests === barberItems.length) {
+                            // All requests completed, show all available times
+                            timeSelect.innerHTML = '<option value="">Select a time</option>';
+                            const now = new Date();
+                            const currentHour = now.getHours();
+                            const currentMinute = now.getMinutes();
+                            
+                            Array.from(allTimes).sort().forEach(time => {
+                                const [hour, minute] = time.split(':').map(Number);
+                                const timeInMinutes = hour * 60 + minute;
+                                const currentTimeInMinutes = currentHour * 60 + currentMinute;
+                                
+                                if (timeInMinutes > currentTimeInMinutes) {
+                                    const today = new Date().toISOString().split('T')[0];
+                                    const datetime = `${today}T${time}:00`;
+                                    timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
+                                }
+                            });
+                            timeSelect.disabled = false;
+                        }
+                    })
+                    .catch(error => {
+                        completedRequests++;
+                        if (completedRequests === barberItems.length) {
+                            timeSelect.innerHTML = '<option value="">Error loading times</option>';
+                            timeSelect.disabled = false;
                         }
                     });
-                    timeSelect.disabled = false;
-                })
-                .catch(error => {
-                    timeSelect.innerHTML = '<option value="">Error loading times</option>';
-                    timeSelect.disabled = false;
-                });
+            });
         } else {
             fetch(`/api/available-times/${barberId}/${serviceId}?t=${Date.now()}`)
                 .then(response => response.json())
