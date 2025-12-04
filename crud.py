@@ -349,21 +349,27 @@ def get_barbers_with_revenue_by_location(db: Session, location_id: int):
     barbers = db.query(models.Barber).filter(models.Barber.location_id == location_id).all()
     today = datetime.now().date()
     
-    # Get all today's appointments in one query
-    today_appointments = db.query(models.Appointment).filter(
-        models.Appointment.appointment_time >= today,
-        models.Appointment.appointment_time < today + timedelta(days=1)
-    ).all()
-    
-    # Group by barber
     for barber in barbers:
-        barber_appointments = [apt for apt in today_appointments if apt.barber_id == barber.id]
-        completed = [apt for apt in barber_appointments if apt.status == "completed"]
-        scheduled = [apt for apt in barber_appointments if apt.status == "scheduled"]
+        # Get today's completed appointments
+        completed_appointments = db.query(models.Appointment).filter(
+            models.Appointment.barber_id == barber.id,
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "completed"
+        ).all()
         
-        barber.today_revenue = sum(apt.custom_price or apt.service.price for apt in completed)
-        barber.today_appointments = len(completed)
-        barber.total_today_appointments = len(scheduled) + len(completed)
+        barber.today_revenue = sum(apt.custom_price or apt.service.price for apt in completed_appointments)
+        barber.today_appointments = len(completed_appointments)
+        
+        # Get total scheduled appointments for today (exclude cancelled and completed)
+        scheduled_today = db.query(models.Appointment).filter(
+            models.Appointment.barber_id == barber.id,
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "scheduled"
+        ).count()
+        
+        barber.total_today_appointments = scheduled_today + len(completed_appointments)
     
     return barbers
 
