@@ -428,11 +428,18 @@ async def add_manual_appointment(
     service_id: int = Form(...),
     barber_id: int = Form(...),
     appointment_time: str = Form(...),
+    duration: int = Form(...),
+    price: float = Form(...),
     db: Session = Depends(get_db)
 ):
     try:
         # Admin can create appointments at any time - bypass time validation
-        crud.create_appointment_admin(db, client_name, "", service_id, barber_id, appointment_time)
+        appointment = crud.create_appointment_admin(db, client_name, "", service_id, barber_id, appointment_time)
+        
+        # Set custom duration and price
+        appointment.custom_duration = duration
+        appointment.custom_price = price
+        db.commit()
         
         # Trigger dashboard refresh
         global last_booking_time

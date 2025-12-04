@@ -116,12 +116,25 @@
 
             <div class="form-group">
                 <label for="quickService">Service:</label>
-                <select id="quickService" name="service_id" required>
+                <select id="quickService" name="service_id" required onchange="updateServiceDuration()">
                     <option value="">Select service</option>
                     {% for service in services %}
-                    <option value="{{ service.id }}">{{ service.name }} - €{{ service.price }}</option>
+                    <option value="{{ service.id }}" data-duration="{{ service.duration }}" data-price="{{ service.price }}">{{ service.name }} - €{{ service.price }}</option>
                     {% endfor %}
                 </select>
+            </div>
+            <div class="form-group">
+                <label for="quickDuration">Duration (minutes):</label>
+                <select id="quickDuration" name="duration" required>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="90">1.5 hours</option>
+                    <option value="120">2 hours</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quickPrice">Price (€):</label>
+                <input type="number" id="quickPrice" name="price" step="0.01" min="0" required>
             </div>
             <input type="hidden" id="quickBarberId" name="barber_id">
             <input type="hidden" id="quickAppointmentTime" name="appointment_time">
@@ -212,6 +225,20 @@ window.onclick = function(event) {
     const modal = document.getElementById('quickBookingModal');
     if (event.target == modal) {
         closeQuickBooking();
+    }
+}
+
+// Update duration and price when service is selected
+function updateServiceDuration() {
+    const serviceSelect = document.getElementById('quickService');
+    const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+    
+    if (selectedOption.value) {
+        const duration = selectedOption.getAttribute('data-duration');
+        const price = selectedOption.getAttribute('data-price');
+        
+        document.getElementById('quickDuration').value = duration;
+        document.getElementById('quickPrice').value = price;
     }
 }
 
