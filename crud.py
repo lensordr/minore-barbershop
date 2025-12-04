@@ -127,22 +127,20 @@ def create_appointment_admin(db: Session, client_name: str, phone: str, service_
     if not service:
         raise ValueError("Service not found")
     
-    service_duration = service.duration
-    appointment_end = appointment_dt + timedelta(minutes=service_duration)
+    # Quick check: only look for conflicts on the same day
+    today = appointment_dt.date()
+    start_of_day = datetime.combine(today, datetime.min.time())
+    end_of_day = datetime.combine(today, datetime.max.time())
     
-    # Check for time conflicts with existing appointments
-    existing_appointments = db.query(models.Appointment).filter(
+    # Check for exact time conflicts only (admin can override if needed)
+    existing = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
+        models.Appointment.appointment_time == appointment_dt,
         models.Appointment.status != "cancelled"
-    ).all()
+    ).first()
     
-    for existing in existing_appointments:
-        existing_duration = existing.custom_duration or existing.service.duration
-        existing_end = existing.appointment_time + timedelta(minutes=existing_duration)
-        
-        # Check if appointments overlap
-        if (appointment_dt < existing_end and appointment_end > existing.appointment_time):
-            raise ValueError("Time slot conflicts with existing appointment")
+    if existing:
+        raise ValueError("Time slot already booked")
     
     appointment = models.Appointment(
         client_name=client_name,
@@ -351,27 +349,21 @@ def get_barbers_with_revenue_by_location(db: Session, location_id: int):
     barbers = db.query(models.Barber).filter(models.Barber.location_id == location_id).all()
     today = datetime.now().date()
     
+    # Get all today's appointments in one query
+    today_appointments = db.query(models.Appointment).filter(
+        models.Appointment.appointment_time >= today,
+        models.Appointment.appointment_time < today + timedelta(days=1)
+    ).all()
+    
+    # Group by barber
     for barber in barbers:
-        # Get today's completed appointments
-        completed_appointments = db.query(models.Appointment).filter(
-            models.Appointment.barber_id == barber.id,
-            models.Appointment.appointment_time >= today,
-            models.Appointment.appointment_time < today + timedelta(days=1),
-            models.Appointment.status == "completed"
-        ).all()
+        barber_appointments = [apt for apt in today_appointments if apt.barber_id == barber.id]
+        completed = [apt for apt in barber_appointments if apt.status == "completed"]
+        scheduled = [apt for apt in barber_appointments if apt.status == "scheduled"]
         
-        barber.today_revenue = sum(apt.custom_price or apt.service.price for apt in completed_appointments)
-        barber.today_appointments = len(completed_appointments)
-        
-        # Get total scheduled appointments for today (exclude cancelled and completed)
-        scheduled_today = db.query(models.Appointment).filter(
-            models.Appointment.barber_id == barber.id,
-            models.Appointment.appointment_time >= today,
-            models.Appointment.appointment_time < today + timedelta(days=1),
-            models.Appointment.status == "scheduled"
-        ).count()
-        
-        barber.total_today_appointments = scheduled_today + len(completed_appointments)
+        barber.today_revenue = sum(apt.custom_price or apt.service.price for apt in completed)
+        barber.today_appointments = len(completed)
+        barber.total_today_appointments = len(scheduled) + len(completed)
     
     return barbers
 

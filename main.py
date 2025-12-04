@@ -304,7 +304,7 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
     
     active_barbers = crud.get_active_barbers_by_location(db, location)
     
-    response = templates.TemplateResponse("admin_dashboard.html", {
+    return templates.TemplateResponse("admin_dashboard.html", {
         "request": request,
         "appointments": appointments,
         "barbers": active_barbers,
@@ -317,10 +317,6 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
         "location": location_name,
         "location_id": location
     })
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    response.headers["Pragma"] = "no-cache"
-    response.headers["Expires"] = "0"
-    return response
 
 @app.get("/admin/staff", response_class=HTMLResponse)
 async def staff_management(request: Request, location: int = None, db: Session = Depends(get_db)):
