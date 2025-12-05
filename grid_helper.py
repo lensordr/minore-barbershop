@@ -38,7 +38,6 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
         slots_needed = (duration + 29) // 30  # Round up to nearest 30min slot
         
         if barber_id in grid and start_time in grid[barber_id]:
-            print(f"Processing appointment {appointment.id} at {start_time}, duration {duration}min, slots_needed {slots_needed}")
             # Mark the starting slot
             grid[barber_id][start_time] = {
                 "type": "appointment",
@@ -58,6 +57,5 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
                         "is_start": False,
                         "span_rows": 1
                     }
-                    print(f"Marking {next_slot} as continuation for appointment {appointment.id}")
     
     return {"grid": grid, "hours": hours}
