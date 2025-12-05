@@ -122,26 +122,7 @@ def create_appointment(db: Session, client_name: str, email: str, phone: str, se
 def create_appointment_admin(db: Session, client_name: str, phone: str, service_id: int, barber_id: int, appointment_time: str):
     appointment_dt = datetime.fromisoformat(appointment_time)
     
-    # Get service duration
-    service = db.query(models.Service).filter(models.Service.id == service_id).first()
-    if not service:
-        raise ValueError("Service not found")
-    
-    # Quick check: only look for conflicts on the same day
-    today = appointment_dt.date()
-    start_of_day = datetime.combine(today, datetime.min.time())
-    end_of_day = datetime.combine(today, datetime.max.time())
-    
-    # Check for exact time conflicts only (admin can override if needed)
-    existing = db.query(models.Appointment).filter(
-        models.Appointment.barber_id == barber_id,
-        models.Appointment.appointment_time == appointment_dt,
-        models.Appointment.status != "cancelled"
-    ).first()
-    
-    if existing:
-        raise ValueError("Time slot already booked")
-    
+    # Admin appointments: minimal validation for speed
     appointment = models.Appointment(
         client_name=client_name,
         phone=phone,
@@ -478,18 +459,7 @@ def update_appointment_details(db: Session, appointment_id: int, client_name: st
     new_time = datetime.strptime(time, "%H:%M").time()
     new_datetime = datetime.combine(current_date, new_time)
     
-    # Check if new time slot is available with new barber (exclude current appointment)
-    existing = db.query(models.Appointment).filter(
-        models.Appointment.barber_id == barber_id,
-        models.Appointment.appointment_time == new_datetime,
-        models.Appointment.status != "cancelled",
-        models.Appointment.id != appointment_id
-    ).first()
-    
-    if existing:
-        raise ValueError("Time slot already booked for selected barber")
-    
-    # Update appointment
+    # Quick update without extensive validation (admin override)
     appointment.client_name = client_name
     appointment.barber_id = barber_id
     appointment.appointment_time = new_datetime
