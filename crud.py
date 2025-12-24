@@ -138,34 +138,38 @@ def create_appointment_admin(db: Session, client_name: str, phone: str, service_
 def create_appointment_lightning_fast(db: Session, client_name: str, service_id: int, barber_id: int, appointment_time: str, duration: int, price: float):
     appointment_dt = datetime.fromisoformat(appointment_time)
     
-    # CRITICAL: Check for existing appointments at this exact time and barber
+    # CRITICAL: Check for ANY overlapping appointments
+    service_duration = duration
+    appointment_end = appointment_dt + timedelta(minutes=service_duration)
+    
     existing = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
-        models.Appointment.appointment_time == appointment_dt,
         models.Appointment.status != "cancelled"
-    ).first()
+    ).all()
     
-    if existing:
-        raise ValueError(f"Time slot already occupied by {existing.client_name}")
+    # Check for time conflicts
+    for existing_apt in existing:
+        existing_duration = existing_apt.custom_duration or existing_apt.service.duration
+        existing_end = existing_apt.appointment_time + timedelta(minutes=existing_duration)
+        
+        # Check if appointments overlap
+        if (appointment_dt < existing_end and appointment_end > existing_apt.appointment_time):
+            raise ValueError(f"Time slot conflicts with {existing_apt.client_name} at {existing_apt.appointment_time.strftime('%H:%M')}")
     
-    # Safe appointment creation with proper isolation
-    try:
-        appointment = models.Appointment(
-            client_name=client_name,
-            service_id=service_id,
-            barber_id=barber_id,
-            appointment_time=appointment_dt,
-            custom_duration=duration,
-            custom_price=price,
-            is_online=0  # Mark as walk-in
-        )
-        db.add(appointment)
-        db.flush()  # Get ID without committing
-        db.commit()
-        return appointment.id
-    except Exception as e:
-        db.rollback()
-        raise ValueError(f"Failed to create appointment: {str(e)}")
+    # Safe appointment creation
+    appointment = models.Appointment(
+        client_name=client_name,
+        service_id=service_id,
+        barber_id=barber_id,
+        appointment_time=appointment_dt,
+        custom_duration=duration,
+        custom_price=price,
+        is_online=0
+    )
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    return appointment.id
 
 def get_today_appointments_ordered(db: Session):
     today = datetime.now().date()
