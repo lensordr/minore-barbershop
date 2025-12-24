@@ -694,6 +694,7 @@ async def debug_luca_1300(db: Session = Depends(get_db)):
     return {"luca_appointments_1300": result, "count": len(result)}
 
 @app.get("/export-data")
+async def export_data(db: Session = Depends(get_db)):
     barbers = db.query(models.Barber).all()
     services = db.query(models.Service).all()
     
