@@ -649,10 +649,15 @@ async def broadcast_update(update_type: str, data: dict = None):
                     active_connections.remove(queue)
 
 @app.get("/api/check-refresh")
-async def check_refresh(last_check: float = 0):
+async def check_refresh(last_check: str = "0"):
+    try:
+        last_check_float = float(last_check) if last_check != "undefined" else 0
+    except:
+        last_check_float = 0
+        
     global last_booking_time
     return {
-        "refresh_needed": last_booking_time > last_check,
+        "refresh_needed": last_booking_time > last_check_float,
         "timestamp": last_booking_time
     }
 
