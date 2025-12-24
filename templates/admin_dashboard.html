@@ -396,3 +396,17 @@ eventSource.onmessage = function(event) {
 eventSource.onerror = function(event) {
     console.log('SSE connection error, falling back to polling');
     // Fallback to polling i
+f SSE fails
+    setInterval(() => {
+        fetch(`/api/check-refresh?last_check=${Date.now() / 1000 - 60}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.refresh_needed) {
+                    location.reload();
+                }
+            })
+            .catch(error => console.log('Fallback polling failed:', error));
+    }, 10000);
+};
+</script>
+{% endblock %}
