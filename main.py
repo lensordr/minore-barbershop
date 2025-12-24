@@ -202,7 +202,7 @@ async def create_appointment_helper(
             appointment.is_random = 1
             db.commit()
         
-        print(f"✅ Appointment created: ID={appointment.id}, Name={client_name}, Time={appointment_time}")
+        print(f"✅ Online appointment created: ID={appointment.id}, Name={client_name}, Barber={actual_barber_id}, Time={appointment_time}, is_online={appointment.is_online}")
         # Send email only if provided
         if client_email and client_email.strip():
             service = crud.get_service_by_id(db, service_id)
@@ -453,6 +453,8 @@ async def add_manual_appointment(
     try:
         # Lightning-fast appointment creation
         appointment_id = crud.create_appointment_lightning_fast(db, client_name, service_id, barber_id, appointment_time, duration, price)
+        
+        print(f"✅ Manual appointment created: ID={appointment_id}, Name={client_name}, Barber={barber_id}, Time={appointment_time}, is_online=0")
         
         # Trigger dashboard refresh
         global last_booking_time
