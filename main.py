@@ -226,13 +226,15 @@ async def create_appointment_helper(
         global last_booking_time
         import time
         last_booking_time = time.time()
+        print(f"📢 Broadcasting new appointment: {client_name} at {appointment_time}")
         
         # Broadcast real-time update to admin dashboards
-        import asyncio
         try:
-            asyncio.create_task(broadcast_update("new_appointment", {"client_name": client_name, "time": appointment_time}))
-        except:
-            pass  # Don't fail if broadcast fails
+            import asyncio
+            loop = asyncio.get_event_loop()
+            loop.create_task(broadcast_update("new_appointment", {"client_name": client_name, "time": appointment_time}))
+        except Exception as e:
+            print(f"Broadcast failed: {e}")
         # Redirect with email parameter
         email_param = "true" if client_email and client_email.strip() else "false"
         location_path = "mallorca" if location_id == 1 else "concell"

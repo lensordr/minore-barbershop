@@ -261,7 +261,7 @@ function submitQuickBooking(event) {
     .then(data => {
         if (data.success) {
             closeQuickBooking();
-            location.reload(); // Immediate refresh for admin actions
+            location.reload();
         } else {
             alert(data.message);
             submitBtn.disabled = false;
@@ -321,7 +321,7 @@ function submitEditAppointment(event) {
     .then(data => {
         if (data.success) {
             closeEditAppointment();
-            location.reload(); // Immediate refresh
+            location.reload();
         } else {
             alert(data.message);
         }
@@ -348,7 +348,6 @@ function completeAppointment() {
     .then(() => fetch(`/admin/checkout/${appointmentId}`, { method: 'POST' }))
     .then(() => {
         closeEditAppointment();
-        // Refresh only the grid, not entire page
         location.reload();
     });
 }
@@ -377,36 +376,20 @@ function reopenAppointment() {
     }
 }
 
-// Real-time updates using Server-Sent Events
-console.log('Setting up real-time dashboard updates');
-const eventSource = new EventSource('/api/live-updates');
-
-eventSource.onmessage = function(event) {
-    const data = JSON.parse(event.data);
-    
-    if (data.type === 'new_appointment') {
-        console.log('New appointment detected - refreshing instantly!');
-        location.reload();
-    } else if (data.type === 'appointment_update') {
-        console.log('Appointment updated - refreshing!');
-        location.reload();
-    }
-};
-
-eventSource.onerror = function(event) {
-    console.log('SSE connection error, falling back to polling');
-    // Fallback to polling i
-f SSE fails
-    setInterval(() => {
-        fetch(`/api/check-refresh?last_check=${Date.now() / 1000 - 60}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.refresh_needed) {
-                    location.reload();
-                }
-            })
-            .catch(error => console.log('Fallback polling failed:', error));
-    }, 10000);
-};
+// Simple polling for updates - fast and reliable
+console.log('Setting up polling for updates');
+let lastCheck = Date.now() / 1000;
+setInterval(() => {
+    fetch(`/api/check-refresh?last_check=${lastCheck}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.refresh_needed) {
+                console.log('New appointment detected - refreshing!');
+                location.reload();
+            }
+            lastCheck = data.timestamp;
+        })
+        .catch(error => console.log('Polling failed:', error));
+}, 3000); // 3 second polling for fast updates
 </script>
 {% endblock %}
