@@ -4,9 +4,9 @@
 
 {% block header %}
 <nav class="admin-nav">
-    <a href="/admin/dashboard" class="active">Dashboard</a>
-    <a href="/admin/staff">Staff</a>
-    <a href="/admin/revenue">Revenue</a>
+    <a href="/admin/dashboard?location={{ location_id }}" class="active">Dashboard</a>
+    <a href="/admin/staff?location={{ location_id }}">Staff</a>
+    <a href="/admin/revenue?location={{ location_id }}">Revenue</a>
     <a href="/admin/logout" class="logout-btn">Logout</a>
 </nav>
 {% endblock %}

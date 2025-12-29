@@ -66,11 +66,11 @@ if os.environ.get('RENDER_EXTERNAL_URL'):
                 app_url = os.environ.get('RENDER_EXTERNAL_URL')
                 async with aiohttp.ClientSession() as session:
                     async with session.get(f"{app_url}/") as response:
-                        print(f"Keep-alive: {response.status}")
+                        print(f"✅ Keep-alive: {response.status} at {current_hour}:00 CET")
             except Exception as e:
                 print(f"Keep-alive error: {e}")
         else:
-            print(f"Outside business hours ({current_hour}:00 CET) - sleeping")
+            print(f"💤 Outside business hours ({current_hour}:00 CET) - app should sleep")
     
     # Keep-alive every 14 minutes to prevent Render sleep (15min timeout)
     scheduler.add_job(keep_alive, 'interval', minutes=14, id='keep_alive')
