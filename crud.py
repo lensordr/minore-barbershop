@@ -185,11 +185,12 @@ def get_today_appointments_ordered_by_location(db: Session, location_id: int):
         models.Appointment.appointment_time >= today,
         models.Appointment.appointment_time < today + timedelta(days=1),
         models.Appointment.status != "cancelled",
-        models.Barber.location_id == location_id
+        models.Barber.location_id == location_id,
+        models.Barber.active == 1  # Only show appointments for active barbers
     ).order_by(models.Appointment.appointment_time).all()
     
     # Debug logging
-    print(f"📋 Loading {len(appointments)} appointments for location {location_id}:")
+    print(f"📋 Loading {len(appointments)} appointments for location {location_id} (active barbers only):")
     for apt in appointments:
         print(f"  - ID={apt.id}, Name={apt.client_name}, Barber={apt.barber_id}, Time={apt.appointment_time.strftime('%H:%M')}, is_online={apt.is_online}")
     
