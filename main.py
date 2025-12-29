@@ -331,25 +331,32 @@ async def staff_management(request: Request, location: int = None, db: Session =
     })
 
 @app.post("/admin/add-barber")
-async def add_barber(name: str = Form(...), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
-    location_id = int(os.environ.get('DEFAULT_LOCATION', 1))
-    crud.create_barber(db, name, location_id)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+async def add_barber(request: Request, name: str = Form(...), location: int = Form(None), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    crud.create_barber(db, name, location)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/delete-barber/{barber_id}")
-async def delete_barber(barber_id: int, db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+async def delete_barber(barber_id: int, request: Request, location: int = Form(None), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.delete_barber(db, barber_id)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/toggle-barber/{barber_id}")
-async def toggle_barber(barber_id: int, db: Session = Depends(get_db)):
+async def toggle_barber(barber_id: int, request: Request, location: int = Form(None), db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.toggle_barber_status(db, barber_id)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/edit-barber/{barber_id}")
-async def edit_barber(barber_id: int, name: str = Form(...), db: Session = Depends(get_db)):
+async def edit_barber(barber_id: int, name: str = Form(...), location: int = Form(None), db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.update_barber_name(db, barber_id, name)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/add-service")
 async def add_service(
@@ -357,12 +364,14 @@ async def add_service(
     description: str = Form(...),
     duration: int = Form(...),
     price: float = Form(...),
+    location: int = Form(None),
     db: Session = Depends(get_db),
     auth: bool = Depends(check_admin_auth)
 ):
-    location_id = int(os.environ.get('DEFAULT_LOCATION', 1))
-    crud.create_service(db, name, duration, price, description, location_id)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    crud.create_service(db, name, duration, price, description, location)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/edit-service/{service_id}")
 async def edit_service(
@@ -371,16 +380,21 @@ async def edit_service(
     description: str = Form(...),
     duration: int = Form(...),
     price: float = Form(...),
+    location: int = Form(None),
     db: Session = Depends(get_db),
     auth: bool = Depends(check_admin_auth)
 ):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.update_service(db, service_id, name, duration, price, description)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/delete-service/{service_id}")
-async def delete_service(service_id: int, db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+async def delete_service(service_id: int, location: int = Form(None), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.delete_service(db, service_id)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/checkout/{appointment_id}")
 async def checkout_appointment(appointment_id: int, db: Session = Depends(get_db)):
@@ -470,21 +484,28 @@ async def add_manual_appointment(
 async def update_schedule(
     start_hour: int = Form(...),
     end_hour: int = Form(...),
+    location: int = Form(None),
     db: Session = Depends(get_db),
     auth: bool = Depends(check_admin_auth)
 ):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.update_schedule(db, start_hour, end_hour)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/toggle-schedule")
-async def toggle_schedule(db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+async def toggle_schedule(location: int = Form(None), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     crud.toggle_schedule(db)
-    return RedirectResponse(url="/admin/staff", status_code=303)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 @app.post("/admin/cleanup")
-async def cleanup_daily(db: Session = Depends(get_db)):
+async def cleanup_daily(location: int = Form(None), db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
     cleaned = crud.cleanup_daily_and_save_revenue(db)
-    return RedirectResponse(url="/admin/dashboard", status_code=303)
+    return RedirectResponse(url=f"/admin/dashboard?location={location}", status_code=303)
 
 @app.get("/admin/revenue", response_class=HTMLResponse)
 async def revenue_reports(request: Request, view: str = "monthly", date: str = None, location: int = None, revenue_logged_in: str = Cookie(None), db: Session = Depends(get_db)):
@@ -529,8 +550,10 @@ async def revenue_login_post(request: Request, password: str = Form(...), db: Se
         })
 
 @app.get("/admin/revenue-logout")
-async def revenue_logout():
-    response = RedirectResponse(url="/admin/dashboard", status_code=303)
+async def revenue_logout(request: Request, location: int = None):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    response = RedirectResponse(url=f"/admin/dashboard?location={location}", status_code=303)
     response.delete_cookie("revenue_logged_in")
     return response
 

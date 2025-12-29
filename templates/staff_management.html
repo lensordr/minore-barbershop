@@ -24,6 +24,7 @@
                     <p style="margin: 0.5rem 0 0 0; color: #fbcc93; opacity: 0.8; font-size: 0.9rem;">{% if schedule.is_open %}Bookings are OPEN{% else %}Bookings are CLOSED{% endif %}</p>
                 </div>
                 <form method="POST" action="/admin/toggle-schedule" style="margin: 0;">
+                    <input type="hidden" name="location" value="{{ location_id }}">
                     <button type="submit" class="btn" style="{% if schedule.is_open %}background: #dc3545; color: white;{% else %}background: #28a745; color: white;{% endif %} padding: 0.75rem 1.5rem; font-weight: bold;">
                         {% if schedule.is_open %}🔒 CLOSE Schedule{% else %}🔓 OPEN Schedule{% endif %}
                     </button>
@@ -32,6 +33,7 @@
         </div>
         
         <form method="POST" action="/admin/update-schedule" class="schedule-form">
+            <input type="hidden" name="location" value="{{ location_id }}">
             <div class="schedule-row">
                 <label>Opening Hour:</label>
                 <select name="start_hour">
@@ -56,6 +58,7 @@
     <div class="section">
         <h2>Add New Barber</h2>
         <form method="POST" action="/admin/add-barber" class="inline-form">
+            <input type="hidden" name="location" value="{{ location_id }}">
             <input type="text" name="name" placeholder="Barber name" required>
             <button type="submit" class="btn btn-primary">Add Barber</button>
         </form>
@@ -73,10 +76,12 @@
                 <div class="staff-actions">
                     <button onclick="editBarber({{ barber.id }}, '{{ barber.name|replace("'", "\\'")|safe }}')" class="btn-edit">Edit</button>
                     <form method="POST" action="/admin/toggle-barber/{{ barber.id }}" style="display: inline;">
+                        <input type="hidden" name="location" value="{{ location_id }}">
                         <button type="submit" class="btn-toggle">{% if barber.active %}Close{% else %}Open{% endif %}</button>
                     </form>
                     {% if barber.name != 'Luca' %}
                     <form method="POST" action="/admin/delete-barber/{{ barber.id }}" style="display: inline;">
+                        <input type="hidden" name="location" value="{{ location_id }}">
                         <button type="submit" class="btn-delete" onclick="return confirm('Delete barber?')">Delete</button>
                     </form>
                     {% endif %}
@@ -89,6 +94,7 @@
     <div class="section">
         <h2>Add New Service</h2>
         <form method="POST" action="/admin/add-service" class="service-form">
+            <input type="hidden" name="location" value="{{ location_id }}">
             <div class="form-row">
                 <input type="text" name="name" placeholder="Service name" required>
                 <input type="text" name="description" placeholder="Description" required>
@@ -112,6 +118,7 @@
                 <div class="service-actions">
                     <button onclick="editService({{ service.id }}, '{{ service.name|replace("'", "\\'")|safe }}', '{{ (service.description or "")|replace("'", "\\'")|safe }}', {{ service.duration }}, {{ service.price }})" class="btn-edit">Edit</button>
                     <form method="POST" action="/admin/delete-service/{{ service.id }}" style="display: inline;">
+                        <input type="hidden" name="location" value="{{ location_id }}">
                         <button type="submit" class="btn-delete" onclick="return confirm('Delete service?')">Delete</button>
                     </form>
                 </div>
@@ -161,6 +168,14 @@ function editService(id, name, description, duration, price) {
     document.getElementById('editDuration').value = duration;
     document.getElementById('editPrice').value = price;
     document.getElementById('editForm').action = '/admin/edit-service/' + id;
+    
+    // Add location hidden field
+    const locationInput = document.createElement('input');
+    locationInput.type = 'hidden';
+    locationInput.name = 'location';
+    locationInput.value = '{{ location_id }}';
+    document.getElementById('editForm').appendChild(locationInput);
+    
     document.getElementById('editModal').style.display = 'block';
 }
 
@@ -171,6 +186,14 @@ function closeModal() {
 function editBarber(id, name) {
     document.getElementById('editBarberName').value = name || '';
     document.getElementById('editBarberForm').action = '/admin/edit-barber/' + id;
+    
+    // Add location hidden field
+    const locationInput = document.createElement('input');
+    locationInput.type = 'hidden';
+    locationInput.name = 'location';
+    locationInput.value = '{{ location_id }}';
+    document.getElementById('editBarberForm').appendChild(locationInput);
+    
     document.getElementById('editBarberModal').style.display = 'block';
 }
 
