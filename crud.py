@@ -295,9 +295,9 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     if not schedule.is_open:
         return []  # No times available when schedule is closed
     
-    # Block Sunday bookings (weekday 6 = Sunday) - but allow if it's today for testing
-    if today.weekday() == 6 and today != datetime.now().date():
-        return []  # No times available on Sunday (except today for testing)
+    # Block Sunday bookings (weekday 6 = Sunday)
+    if today.weekday() == 6:
+        return []  # No times available on Sunday
     
     # Get service duration
     service = db.query(models.Service).filter(models.Service.id == service_id).first()
