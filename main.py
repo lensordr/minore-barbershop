@@ -603,6 +603,7 @@ async def edit_appointment(
 @app.post("/admin/add-appointment")
 async def add_manual_appointment(
     client_name: str = Form(...),
+    client_phone: str = Form(...),
     service_id: int = Form(...),
     barber_id: int = Form(...),
     appointment_time: str = Form(...),
@@ -611,25 +612,22 @@ async def add_manual_appointment(
     db: Session = Depends(get_db)
 ):
     try:
-        # Try to find existing client by name (basic matching)
-        existing_client = db.query(models.Client).filter(
-            models.Client.name.ilike(f"%{client_name}%")
-        ).first()
+        # Get or create client account
+        client = crud.get_or_create_client(db, client_phone.strip(), client_name.strip(), "")
         
         # Lightning-fast appointment creation
         appointment_id = crud.create_appointment_lightning_fast(db, client_name, service_id, barber_id, appointment_time, duration, price)
         
-        # Link to client account if found
-        if existing_client:
-            appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
-            if appointment:
-                appointment.client_id = existing_client.id
-                appointment.phone = existing_client.phone
-                appointment.email = existing_client.email
-                db.commit()
-                print(f"✅ Linked appointment to existing client: {existing_client.phone}")
+        # Link to client account
+        appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+        if appointment:
+            appointment.client_id = client.id
+            appointment.phone = client.phone
+            appointment.email = client.email
+            db.commit()
+            print(f"✅ Linked appointment to client: {client.phone}")
         
-        print(f"✅ Manual appointment created: ID={appointment_id}, Name={client_name}, Barber={barber_id}, Time={appointment_time}, is_online=0")
+        print(f"✅ Manual appointment created: ID={appointment_id}, Name={client_name}, Phone={client_phone}, Barber={barber_id}, Time={appointment_time}")
         
         # Trigger dashboard refresh
         global last_booking_time
