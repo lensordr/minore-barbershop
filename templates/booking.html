@@ -19,19 +19,14 @@
     {% endif %}
     
     <form method="POST" action="{% if location_id == 1 %}/mallorca/book{% else %}/concell/book{% endif %}" id="bookingForm">
-        <div class="form-group">
-            <label for="client_name">Your Name</label>
-            <input type="text" id="client_name" name="client_name" required>
-        </div>
+        <!-- Hidden pre-filled client info -->
+        <input type="hidden" name="client_name" value="{{ client.name or client.phone }}">
+        <input type="hidden" name="client_email" value="{{ client.email }}">
+        <input type="hidden" name="client_phone" value="{{ client.phone }}">
         
-        <div class="form-group">
-            <label for="client_email">Your Email (optional - for confirmation & cancellation)</label>
-            <input type="email" id="client_email" name="client_email" placeholder="Leave empty if you don't want email notifications">
-        </div>
-        
-        <div class="form-group">
-            <label for="client_phone">Your Phone</label>
-            <input type="tel" id="client_phone" name="client_phone" required>
+        <div class="client-info-display">
+            <h3>Booking for: {{ client.name or client.phone }}</h3>
+            {% if client.email %}<p>Email: {{ client.email }}</p>{% endif %}
         </div>
         
 
@@ -92,6 +87,27 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+.client-info-display {
+    background: #2a2a2a;
+    padding: 1rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid #fbcc93;
+}
+
+.client-info-display h3 {
+    color: #fbcc93;
+    margin: 0 0 0.5rem 0;
+    font-size: 1.1rem;
+}
+
+.client-info-display p {
+    color: #ccc;
+    margin: 0;
+    font-size: 0.9rem;
+}
+</style>
 <script>
 function updateAvailableTimes() {
     // Check if current time is before 11 AM
