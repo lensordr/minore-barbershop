@@ -168,13 +168,23 @@ async def client_login_post(
     response = RedirectResponse(url=redirect_url, status_code=303)
     response.set_cookie("client_phone", client.phone, max_age=86400*30)  # 30 days
     return response
-async def book_appointment_concell(request: Request, db: Session = Depends(get_db)):
+@app.get("/concell/book", response_class=HTMLResponse)
+async def book_appointment_concell(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
     
     schedule = crud.get_schedule(db)
     if not schedule.is_open:
         return HTMLResponse("<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are temporarily closed. Please check back later.</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
+    
+    # Check if client is logged in
+    if not client_phone:
+        return RedirectResponse(url="/client/login?location=concell", status_code=303)
+    
+    # Get client info
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return RedirectResponse(url="/client/login?location=concell", status_code=303)
     
     services = crud.get_services_by_location(db, 2)
     barbers = crud.get_active_barbers_by_location(db, 2)
@@ -183,7 +193,8 @@ async def book_appointment_concell(request: Request, db: Session = Depends(get_d
         "services": services, 
         "barbers": barbers,
         "location": "Concell",
-        "location_id": 2
+        "location_id": 2,
+        "client": client
     })
 
 @app.get("/book", response_class=HTMLResponse)
