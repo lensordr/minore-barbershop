@@ -7,42 +7,21 @@
     <div class="success-icon">✓</div>
     <h2>Appointment Confirmed!</h2>
     <p>Your appointment has been successfully booked.</p>
-    <div id="email-confirmation" style="display: none;">
-        <p>📧 A confirmation email with appointment details and cancellation link has been sent to your email address.</p>
-        <p><strong>⚠️ Please check your SPAM/JUNK folder if you don't see the email in your inbox.</strong></p>
-    </div>
-    <div id="no-email-confirmation" style="display: none;">
-        <p>📝 Your appointment has been confirmed! Since no email was provided, you won't receive email notifications.</p>
-    </div>
-    <p>We'll see you soon at MINORE BARBER!</p>
     
     <div class="next-steps">
         <h3>What's Next?</h3>
-        <p id="email-steps" style="display: none;">• Check your email (including spam folder) for appointment details</p>
-        <p id="email-contacts" style="display: none;">• Add our email to your contacts to avoid spam</p>
-        <p id="email-cancel" style="display: none;">• Save the cancellation link if you need to reschedule</p>
-        <p id="no-email-steps" style="display: none;">• Contact us directly if you need to cancel or reschedule</p>
-        <p>• Arrive 5 minutes early for your appointment</p>
+        <p>📱 <strong>Check your client dashboard</strong> to view appointment details</p>
+        <p>🔄 Use your dashboard to cancel or reschedule if needed</p>
+        <p>⏰ Arrive 5 minutes early for your appointment</p>
     </div>
     
-    <a href="/book" class="btn btn-secondary">Book Another</a>
+    <div class="action-buttons">
+        <a href="/client/dashboard" class="btn btn-primary">View My Dashboard</a>
+        <a href="/locations" class="btn btn-secondary">Book Another</a>
+    </div>
+    
+    <p style="margin-top: 2rem;">We'll see you soon at MINORE BARBER - {{ location }}!</p>
 </div>
-
-<script>
-// Show appropriate message based on whether email was provided
-const urlParams = new URLSearchParams(window.location.search);
-const hasEmail = urlParams.get('email') === 'true';
-
-if (hasEmail) {
-    document.getElementById('email-confirmation').style.display = 'block';
-    document.getElementById('email-steps').style.display = 'block';
-    document.getElementById('email-contacts').style.display = 'block';
-    document.getElementById('email-cancel').style.display = 'block';
-} else {
-    document.getElementById('no-email-confirmation').style.display = 'block';
-    document.getElementById('no-email-steps').style.display = 'block';
-}
-</script>
 
 <style>
 .next-steps {
@@ -60,6 +39,18 @@ if (hasEmail) {
 
 .next-steps p {
     margin: 0.5rem 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 2rem 0;
+}
+
+.action-buttons .btn {
+    flex: 1;
+    max-width: 200px;
 }
 </style>
 {% endblock %}
