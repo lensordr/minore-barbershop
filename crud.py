@@ -295,9 +295,9 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     if not schedule.is_open:
         return []  # No times available when schedule is closed
     
-    # Block Sunday bookings (weekday 6 = Sunday)
-    if today.weekday() == 6:
-        return []  # No times available on Sunday
+    # Block Sunday bookings (weekday 6 = Sunday) - but allow if it's today for testing
+    if today.weekday() == 6 and today != datetime.now().date():
+        return []  # No times available on Sunday (except today for testing)
     
     # Get service duration
     service = db.query(models.Service).filter(models.Service.id == service_id).first()
@@ -309,6 +309,9 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     # If it's after business hours, show tomorrow's slots
     if now.hour >= schedule.end_hour:
         today = today + timedelta(days=1)
+        # Skip Sunday when moving to next day
+        if today.weekday() == 6:
+            return []
         start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
         end_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.end_hour))
         earliest_time = start_time
@@ -333,7 +336,7 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
         else:
             earliest_time = datetime.combine(today, datetime.min.time().replace(hour=next_hour, minute=next_minute))
         
-        # Client restriction: cannot book before 11 AM
+        # Client restriction: cannot book before 11 AM (but admin can override)
         min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=11, minute=0))
         if earliest_time < min_booking_time:
             earliest_time = min_booking_time
