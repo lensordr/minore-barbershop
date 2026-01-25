@@ -13,6 +13,7 @@
         {% endif %}
         
         <form method="POST" action="/client/login">
+            <input type="hidden" name="location" value="{{ location or 'mallorca' }}">
             <div class="form-group">
                 <label for="phone">Phone Number *</label>
                 <input type="tel" id="phone" name="phone" placeholder="+34 123 456 789" required>

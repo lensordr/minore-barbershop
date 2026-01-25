@@ -85,19 +85,4 @@ class MonthlyRevenue(Base):
     year = Column(Integer)
     month = Column(Integer)
     revenue = Column(Float, default=0.0)
-    appointments_count = Column(Integer, default=0)
-    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
-    
-    barber = relationship("Barber")
-
-class DailyRevenue(Base):
-    __tablename__ = "daily_revenue"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    barber_id = Column(Integer, ForeignKey("barbers.id"))
-    date = Column(String)  # YYYY-MM-DD format
-    revenue = Column(Float, default=0.0)
-    appointments_count = Column(Integer, default=0)
-    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
-    
-    barber = relationship("Barber")
+    appointments_c
