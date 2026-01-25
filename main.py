@@ -267,6 +267,12 @@ async def client_cancel_appointment(appointment_id: int, client_phone: str = Coo
     appointment.status = "cancelled"
     db.commit()
     
+    # Trigger admin dashboard refresh
+    global last_booking_time
+    import time
+    last_booking_time = time.time()
+    print(f"Client cancelled appointment! Updated last_booking_time to {last_booking_time}")
+    
     return {"success": True, "message": "Appointment cancelled successfully"}
 
 @app.get("/client/logout")
@@ -872,4 +878,54 @@ async def debug_luca_appointments(db: Session = Depends(get_db)):
                 "status": apt.status,
                 "is_online": apt.is_online or 0,
                 "service": apt.service.name if apt.service else "Unknown",
-                "ba
+                "barber_id": apt.barber_id
+            })
+        
+        return {"luca_appointments": result, "count": len(result), "barber_id": luca.id}
+    except Exception as e:
+        return {"error": str(e)}
+async def debug_luca_1300(db: Session = Depends(get_db)):
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    target_time = datetime.combine(today, datetime.min.time().replace(hour=13, minute=0))
+    
+    # Find Luca's barber ID
+    luca = db.query(models.Barber).filter(models.Barber.name == "Luca").first()
+    if not luca:
+        return {"error": "Luca not found"}
+    
+    # Get appointments for Luca at 13:00
+    appointments = db.query(models.Appointment).filter(
+        models.Appointment.barber_id == luca.id,
+        models.Appointment.appointment_time >= target_time,
+        models.Appointment.appointment_time < target_time + timedelta(hours=1)
+    ).all()
+    
+    result = []
+    for apt in appointments:
+        result.append({
+            "id": apt.id,
+            "client_name": apt.client_name,
+            "time": apt.appointment_time.strftime("%H:%M"),
+            "status": apt.status,
+            "is_online": apt.is_online,
+            "service": apt.service.name,
+            "created_at": str(apt.id)  # ID shows creation order
+        })
+    
+    return {"luca_appointments_1300": result, "count": len(result)}
+
+@app.get("/export-data")
+async def export_data(db: Session = Depends(get_db)):
+    barbers = db.query(models.Barber).all()
+    services = db.query(models.Service).all()
+    
+    return {
+        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
+        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
+    }
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
