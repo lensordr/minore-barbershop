@@ -221,11 +221,3 @@ document.querySelectorAll('.barber-item').forEach(item => {
         const barberId = this.getAttribute('data-barber-id');
         document.getElementById('barber_id').value = barberId;
         
-        // Update available times
-        updateAvailableTimes();
-    });
-});
-
-document.getElementById('service_id').addEventListener('change', updateAvailableTimes);
-</script>
-{% endblock %}

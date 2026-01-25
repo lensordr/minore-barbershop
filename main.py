@@ -141,13 +141,32 @@ async def client_login_post(
             "location": location
         })
     
-    # Get or create client
-    client = crud.get_or_create_client(db, phone.strip(), name.strip(), email.strip())
+    phone = phone.strip()
     
-    # Always redirect to dashboard
-    response = RedirectResponse(url="/client/dashboard", status_code=303)
-    response.set_cookie("client_phone", client.phone, max_age=86400*30)  # 30 days
-    return response
+    # Check if client exists
+    existing_client = crud.get_client_by_phone(db, phone)
+    
+    if existing_client:
+        # Client exists - login directly
+        response = RedirectResponse(url="/client/dashboard", status_code=303)
+        response.set_cookie("client_phone", existing_client.phone, max_age=86400*30)
+        return response
+    else:
+        # New client - name is required
+        if not name or name.strip() == "":
+            return templates.TemplateResponse("client_login.html", {
+                "request": request,
+                "error": "Name is required for new accounts",
+                "location": location,
+                "phone": phone,
+                "email": email
+            })
+        
+        # Create new client
+        client = crud.get_or_create_client(db, phone, name.strip(), email.strip())
+        response = RedirectResponse(url="/client/dashboard", status_code=303)
+        response.set_cookie("client_phone", client.phone, max_age=86400*30)
+        return response
 @app.get("/concell/book", response_class=HTMLResponse)
 async def book_appointment_concell(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
     if not check_business_hours():

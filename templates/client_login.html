@@ -16,19 +16,19 @@
             <input type="hidden" name="location" value="{{ location or 'mallorca' }}">
             <div class="form-group">
                 <label for="phone">Phone Number *</label>
-                <input type="tel" id="phone" name="phone" placeholder="+34 123 456 789" required>
+                <input type="tel" id="phone" name="phone" placeholder="+34 123 456 789" value="{{ phone or '' }}" required>
                 <small>We'll use this to find your appointments</small>
             </div>
             
             <div class="form-group">
                 <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" placeholder="Your full name">
-                <small>Only needed for new accounts</small>
+                <input type="text" id="name" name="name" placeholder="Your full name" value="{{ name or '' }}">
+                <small>Required for new accounts</small>
             </div>
             
             <div class="form-group">
                 <label for="email">Email (Optional)</label>
-                <input type="email" id="email" name="email" placeholder="your@email.com">
+                <input type="email" id="email" name="email" placeholder="your@email.com" value="{{ email or '' }}">
                 <small>For appointment confirmations</small>
             </div>
             
