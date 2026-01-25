@@ -105,13 +105,22 @@ async def photos(location: str, filename: str):
     return RedirectResponse(url=f"/static/photos/{location}/{filename}", status_code=301)
 
 @app.get("/mallorca/book", response_class=HTMLResponse)
-async def book_appointment_mallorca(request: Request, db: Session = Depends(get_db)):
+async def book_appointment_mallorca(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP - MALLORCA</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
     
     schedule = crud.get_schedule(db)
     if not schedule.is_open:
         return HTMLResponse("<h1>MINORE BARBERSHOP - MALLORCA</h1><p>We are temporarily closed. Please check back later.</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
+    
+    # Check if client is logged in
+    if not client_phone:
+        return RedirectResponse(url="/client/login?location=mallorca", status_code=303)
+    
+    # Get client info
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return RedirectResponse(url="/client/login?location=mallorca", status_code=303)
     
     services = crud.get_services_by_location(db, 1)
     barbers = crud.get_active_barbers_by_location(db, 1)
@@ -120,10 +129,45 @@ async def book_appointment_mallorca(request: Request, db: Session = Depends(get_
         "services": services, 
         "barbers": barbers,
         "location": "Mallorca",
-        "location_id": 1
+        "location_id": 1,
+        "client": client
     })
 
-@app.get("/concell/book", response_class=HTMLResponse)
+@app.get("/client/login", response_class=HTMLResponse)
+async def client_login(request: Request, location: str = None):
+    return templates.TemplateResponse("client_login.html", {
+        "request": request,
+        "location": location
+    })
+
+@app.post("/client/login")
+async def client_login_post(
+    request: Request,
+    phone: str = Form(...),
+    name: str = Form(""),
+    email: str = Form(""),
+    location: str = Form("mallorca"),
+    db: Session = Depends(get_db)
+):
+    if not phone or phone.strip() == "":
+        return templates.TemplateResponse("client_login.html", {
+            "request": request,
+            "error": "Phone number is required",
+            "location": location
+        })
+    
+    # Get or create client
+    client = crud.get_or_create_client(db, phone.strip(), name.strip(), email.strip())
+    
+    # Set client session
+    if location == "concell":
+        redirect_url = "/concell/book"
+    else:
+        redirect_url = "/mallorca/book"
+    
+    response = RedirectResponse(url=redirect_url, status_code=303)
+    response.set_cookie("client_phone", client.phone, max_age=86400*30)  # 30 days
+    return response
 async def book_appointment_concell(request: Request, db: Session = Depends(get_db)):
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")

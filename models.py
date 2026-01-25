@@ -4,6 +4,17 @@ from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
+class Client(Base):
+    __tablename__ = "clients"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    phone = Column(String, unique=True, index=True)  # Unique phone number
+    name = Column(String)
+    email = Column(String, default="")
+    created_at = Column(DateTime)
+    
+    appointments = relationship("Appointment", back_populates="client")
+
 class Barber(Base):
     __tablename__ = "barbers"
     
@@ -30,8 +41,7 @@ class Appointment(Base):
     __tablename__ = "appointments"
     
     id = Column(Integer, primary_key=True, index=True)
-    client_name = Column(String)
-    phone = Column(String)
+    client_id = Column(Integer, ForeignKey("clients.id", ondelete="CASCADE"))  # Link to client
     appointment_time = Column(DateTime)
     barber_id = Column(Integer, ForeignKey("barbers.id", ondelete="CASCADE"))
     service_id = Column(Integer, ForeignKey("services.id", ondelete="CASCADE"))
@@ -40,10 +50,15 @@ class Appointment(Base):
     custom_duration = Column(Integer, default=None)  # Override service duration
     is_random = Column(Integer, default=0)  # 1 if randomly assigned
     is_online = Column(Integer, default=0)  # 1 if booked online by client
-    email = Column(String, default="")
     cancel_token = Column(String, default="")
-    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
+    # Legacy fields for backward compatibility
+    client_name = Column(String, default="")
+    phone = Column(String, default="")
+    email = Column(String, default="")
+    location_id = Column(Integer, default=1)
+    
+    client = relationship("Client", back_populates="appointments")
     barber = relationship("Barber", back_populates="appointments")
     service = relationship("Service", back_populates="appointments")
 

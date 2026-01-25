@@ -2,6 +2,41 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import models
 
+# Client management functions
+def get_or_create_client(db: Session, phone: str, name: str = "", email: str = ""):
+    """Get existing client or create new one based on phone number"""
+    client = db.query(models.Client).filter(models.Client.phone == phone).first()
+    
+    if not client:
+        client = models.Client(
+            phone=phone,
+            name=name,
+            email=email,
+            created_at=datetime.now()
+        )
+        db.add(client)
+        db.commit()
+        db.refresh(client)
+    else:
+        # Update client info if provided
+        if name and name != client.name:
+            client.name = name
+        if email and email != client.email:
+            client.email = email
+        db.commit()
+    
+    return client
+
+def get_client_by_phone(db: Session, phone: str):
+    """Get client by phone number"""
+    return db.query(models.Client).filter(models.Client.phone == phone).first()
+
+def get_client_appointments(db: Session, client_id: int):
+    """Get all appointments for a client"""
+    return db.query(models.Appointment).filter(
+        models.Appointment.client_id == client_id
+    ).order_by(models.Appointment.appointment_time.desc()).all()
+
 def get_barbers(db: Session):
     return db.query(models.Barber).all()
 
@@ -59,6 +94,9 @@ def delete_service(db: Session, service_id: int):
     return service
 
 def create_appointment(db: Session, client_name: str, email: str, phone: str, service_id: int, barber_id: int, appointment_time: str):
+    if not phone or phone.strip() == "":
+        raise ValueError("Phone number is required")
+    
     appointment_dt = datetime.fromisoformat(appointment_time)
     now = datetime.now()
     
@@ -101,18 +139,23 @@ def create_appointment(db: Session, client_name: str, email: str, phone: str, se
         if (appointment_dt < existing_end and appointment_end > existing.appointment_time):
             raise ValueError("Time slot conflicts with existing appointment")
     
+    # Get or create client account
+    client = get_or_create_client(db, phone, client_name, email)
+    
     from email_service import generate_cancel_token
     cancel_token = generate_cancel_token()
     
     appointment = models.Appointment(
-        client_name=client_name,
-        email=email,
-        phone=phone,
+        client_id=client.id,
+        appointment_time=appointment_dt,
         service_id=service_id,
         barber_id=barber_id,
-        appointment_time=appointment_dt,
         cancel_token=cancel_token,
-        is_online=1
+        is_online=1,
+        # Legacy fields for compatibility
+        client_name=client_name,
+        phone=phone,
+        email=email
     )
     db.add(appointment)
     db.commit()
