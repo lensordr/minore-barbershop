@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}My Appointments - MINORE BARBERSHOP{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>Welcome, {{ client.name or "Customer" }}</h2>
+        <p>Phone: {{ client.phone }}</p>
+        <div class="dashboard-actions">
+            <a href="/{{ location.lower() }}/book" class="btn btn-primary">Book New Appointment</a>
+            <a href="/client/logout" class="btn btn-secondary">Logout</a>
+        </div>
+    </div>
+
+    <div class="appointments-section">
+        <h3>Your Appointments</h3>
+        
+        {% if upcoming_appointments %}
+        <div class="appointments-list">
+            <h4>Upcoming</h4>
+            {% for appointment in upcoming_appointments %}
+            <div class="appointment-card upcoming">
+                <div class="appointment-info">
+                    <div class="appointment-time">
+                        <strong>{{ appointment.appointment_time.strftime('%B %d, %Y at %H:%M') }}</strong>
+                    </div>
+                    <div class="appointment-details">
+                        <span class="service">{{ appointment.service.name }}</span>
+                        <span class="barber">with {{ appointment.barber.name }}</span>
+                        <span class="location">{{ location }}</span>
+                    </div>
+                    <div class="appointment-price">€{{ appointment.custom_price or appointment.service.price }}</div>
+                </div>
+                {% if appointment.status == 'scheduled' %}
+                <div class="appointment-actions">
+                    <button onclick="cancelAppointment({{ appointment.id }})" class="btn btn-cancel">Cancel</button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if past_appointments %}
+        <div class="appointments-list">
+            <h4>Past Appointments</h4>
+            {% for appointment in past_appointments %}
+            <div class="appointment-card past">
+                <div class="appointment-info">
+                    <div class="appointment-time">
+                        {{ appointment.appointment_time.strftime('%B %d, %Y at %H:%M') }}
+                    </div>
+                    <div class="appointment-details">
+                        <span class="service">{{ appointment.service.name }}</span>
+                        <span class="barber">with {{ appointment.barber.name }}</span>
+                        <span class="status status-{{ appointment.status }}">{{ appointment.status.title() }}</span>
+                    </div>
+                    <div class="appointment-price">€{{ appointment.custom_price or appointment.service.price }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if not upcoming_appointments and not past_appointments %}
+        <div class="no-appointments">
+            <p>You don't have any appointments yet.</p>
+            <a href="/{{ location.lower() }}/book" class="btn btn-primary">Book Your First Appointment</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.dashboard-container {
+    max-width: 800px;
+    margin: 2rem auto;
+    padding: 2rem;
+}
+
+.dashboard-header {
+    background: #2a2a2a;
+    padding: 2rem;
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dashboard-header h2 {
+    color: #fbcc93;
+    margin: 0;
+}
+
+.dashboard-header p {
+    color: #999;
+    margin: 0.5rem 0 0 0;
+}
+
+.dashboard-actions {
+    display: flex;
+    gap: 1rem;
+}
+
+.appointments-section h3 {
+    color: #fbcc93;
+    margin-bottom: 1.5rem;
+}
+
+.appointments-section h4 {
+    color: #fbcc93;
+    margin: 2rem 0 1rem 0;
+    font-size: 1.2rem;
+}
+
+.appointment-card {
+    background: #2a2a2a;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.appointment-card.upcoming {
+    border-left: 4px solid #28a745;
+}
+
+.appointment-card.past {
+    border-left: 4px solid #6c757d;
+    opacity: 0.8;
+}
+
+.appointment-info {
+    flex: 1;
+}
+
+.appointment-time {
+    color: #fbcc93;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+}
+
+.appointment-details {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.appointment-details span {
+    color: #ccc;
+    font-size: 0.9rem;
+}
+
+.appointment-price {
+    color: #fbcc93;
+    font-weight: bold;
+    font-size: 1.1rem;
+}
+
+.status-completed {
+    color: #28a745;
+}
+
+.status-cancelled {
+    color: #dc3545;
+}
+
+.status-scheduled {
+    color: #ffc107;
+}
+
+.no-appointments {
+    text-align: center;
+    padding: 3rem;
+    background: #2a2a2a;
+    border-radius: 8px;
+}
+
+.no-appointments p {
+    color: #999;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+    }
+    
+    .appointment-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+    
+    .appointment-details {
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+}
+</style>
+
+<script>
+function cancelAppointment(appointmentId) {
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+        fetch(`/client/cancel-appointment/${appointmentId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error cancelling appointment: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error cancelling appointment');
+        });
+    }
+}
+</script>
+{% endblock %}

@@ -197,7 +197,69 @@ async def book_appointment_concell(request: Request, client_phone: str = Cookie(
         "client": client
     })
 
-@app.get("/book", response_class=HTMLResponse)
+@app.get("/client/dashboard", response_class=HTMLResponse)
+async def client_dashboard(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+    
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return RedirectResponse(url="/client/login", status_code=303)
+    
+    # Get client appointments
+    appointments = crud.get_client_appointments(db, client.id)
+    
+    # Separate upcoming and past appointments
+    now = datetime.now()
+    upcoming_appointments = [apt for apt in appointments if apt.appointment_time >= now and apt.status == 'scheduled']
+    past_appointments = [apt for apt in appointments if apt.appointment_time < now or apt.status != 'scheduled']
+    
+    # Determine location based on appointments or default to Mallorca
+    location = "Mallorca"
+    if appointments:
+        # Get location from most recent appointment's barber
+        recent_apt = appointments[0]
+        if recent_apt.barber.location_id == 2:
+            location = "Concell"
+    
+    return templates.TemplateResponse("client_dashboard.html", {
+        "request": request,
+        "client": client,
+        "upcoming_appointments": upcoming_appointments,
+        "past_appointments": past_appointments,
+        "location": location
+    })
+
+@app.post("/client/cancel-appointment/{appointment_id}")
+async def client_cancel_appointment(appointment_id: int, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
+    if not client_phone:
+        return {"success": False, "message": "Not logged in"}
+    
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return {"success": False, "message": "Client not found"}
+    
+    # Verify appointment belongs to client
+    appointment = db.query(models.Appointment).filter(
+        models.Appointment.id == appointment_id,
+        models.Appointment.client_id == client.id,
+        models.Appointment.status == "scheduled"
+    ).first()
+    
+    if not appointment:
+        return {"success": False, "message": "Appointment not found"}
+    
+    # Cancel appointment
+    appointment.status = "cancelled"
+    db.commit()
+    
+    return {"success": True, "message": "Appointment cancelled successfully"}
+
+@app.get("/client/logout")
+async def client_logout():
+    response = RedirectResponse(url="/locations", status_code=303)
+    response.delete_cookie("client_phone")
+    return response
 async def book_appointment_redirect(request: Request, db: Session = Depends(get_db)):
     default_location = int(os.environ.get('DEFAULT_LOCATION', 1))
     if default_location == 1:

@@ -4,7 +4,15 @@
 
 {% block content %}
 <div class="booking-form">
-    <h2>Book Your Appointment</h2>
+    <div class="booking-header">
+        <h2>Book Your Appointment</h2>
+        {% if client %}
+        <div class="client-info">
+            <span>Welcome, {{ client.name or client.phone }}</span>
+            <a href="/client/dashboard" class="btn btn-secondary">My Appointments</a>
+        </div>
+        {% endif %}
+    </div>
     
     {% if error %}
     <div class="error-message">{{ error }}</div>
