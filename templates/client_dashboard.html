@@ -15,11 +15,16 @@
     </div>
 
     <div class="appointments-section">
-        <h3>Your Appointments</h3>
+        <div class="appointments-header">
+            <h3>Your Appointments</h3>
+            <div class="appointment-filters">
+                <button onclick="showUpcoming()" class="filter-btn active" id="upcomingBtn">This Month</button>
+                <button onclick="showPast()" class="filter-btn" id="pastBtn">Past Appointments</button>
+            </div>
+        </div>
         
         {% if upcoming_appointments %}
-        <div class="appointments-list">
-            <h4>Upcoming</h4>
+        <div class="appointments-list" id="upcomingList">
             {% for appointment in upcoming_appointments %}
             <div class="appointment-card upcoming">
                 <div class="appointment-info">
@@ -44,8 +49,7 @@
         {% endif %}
 
         {% if past_appointments %}
-        <div class="appointments-list">
-            <h4>Past Appointments</h4>
+        <div class="appointments-list" id="pastList" style="display: none;">
             {% for appointment in past_appointments %}
             <div class="appointment-card past">
                 <div class="appointment-info">
@@ -189,6 +193,41 @@
     margin-bottom: 1.5rem;
 }
 
+.appointments-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+}
+
+.appointment-filters {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.filter-btn {
+    padding: 0.5rem 1rem;
+    background: #444;
+    color: #ccc;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.filter-btn.active {
+    background: #fbcc93;
+    color: #1d1a1c;
+}
+
+.filter-btn:hover {
+    background: #555;
+}
+
+.filter-btn.active:hover {
+    background: #f4b876;
+}
+
 @media (max-width: 768px) {
     .dashboard-header {
         flex-direction: column;
@@ -227,6 +266,20 @@ function cancelAppointment(appointmentId) {
             alert('Error cancelling appointment');
         });
     }
+}
+
+function showUpcoming() {
+    document.getElementById('upcomingList').style.display = 'block';
+    document.getElementById('pastList').style.display = 'none';
+    document.getElementById('upcomingBtn').classList.add('active');
+    document.getElementById('pastBtn').classList.remove('active');
+}
+
+function showPast() {
+    document.getElementById('upcomingList').style.display = 'none';
+    document.getElementById('pastList').style.display = 'block';
+    document.getElementById('upcomingBtn').classList.remove('active');
+    document.getElementById('pastBtn').classList.add('active');
 }
 </script>
 {% endblock %}
