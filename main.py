@@ -81,10 +81,12 @@ if os.environ.get('RENDER_EXTERNAL_URL'):
 
 
 def check_business_hours():
-    from datetime import timezone, timedelta
-    cet = timezone(timedelta(hours=1))
-    current_time = datetime.now(cet)
-    return 10 <= current_time.hour < 22
+    # Temporarily disabled for testing
+    return True
+    # from datetime import timezone, timedelta
+    # cet = timezone(timedelta(hours=1))
+    # current_time = datetime.now(cet)
+    # return 10 <= current_time.hour < 22
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
