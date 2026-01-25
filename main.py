@@ -274,7 +274,21 @@ async def client_logout():
     response = RedirectResponse(url="/locations", status_code=303)
     response.delete_cookie("client_phone")
     return response
-@app.get("/book", response_class=HTMLResponse)
+@app.post("/client/book/{location}")
+async def client_book_appointment(
+    request: Request,
+    location: str,
+    client_name: str = Form(...),
+    client_email: str = Form(""),
+    client_phone: str = Form(...),
+    service_id: int = Form(...),
+    barber_id: str = Form(...),
+    appointment_time: str = Form(...),
+    client_phone_cookie: str = Cookie(None, alias="client_phone"),
+    db: Session = Depends(get_db)
+):
+    location_id = 1 if location.lower() == "mallorca" else 2
+    return await create_appointment_helper(request, client_name, client_email, client_phone, service_id, barber_id, appointment_time, location_id, db)
 async def book_appointment_redirect(request: Request, db: Session = Depends(get_db)):
     default_location = int(os.environ.get('DEFAULT_LOCATION', 1))
     if default_location == 1:

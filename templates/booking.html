@@ -18,7 +18,7 @@
     <div class="error-message">{{ error }}</div>
     {% endif %}
     
-    <form method="POST" action="{% if location_id == 1 %}/mallorca/book{% else %}/concell/book{% endif %}" id="bookingForm">
+    <form method="POST" action="/client/book/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}" id="bookingForm">
         <!-- Hidden pre-filled client info -->
         <input type="hidden" name="client_name" value="{{ client.name or client.phone }}">
         <input type="hidden" name="client_email" value="{{ client.email }}">
@@ -221,3 +221,11 @@ document.querySelectorAll('.barber-item').forEach(item => {
         const barberId = this.getAttribute('data-barber-id');
         document.getElementById('barber_id').value = barberId;
         
+        // Update available times
+        updateAvailableTimes();
+    });
+});
+
+document.getElementById('service_id').addEventListener('change', updateAvailableTimes);
+</script>
+{% endblock %}
