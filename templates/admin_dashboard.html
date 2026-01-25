@@ -110,13 +110,18 @@
                 <span id="selectedTime"></span>
             </div>
             <div class="form-group">
-                <label for="quickClientName">Client Name:</label>
-                <input type="text" id="quickClientName" name="client_name" required>
+                <label for="quickClientPhone">Phone Number *:</label>
+                <input type="tel" id="quickClientPhone" name="client_phone" required onblur="checkExistingClient()">
             </div>
             
-            <div class="form-group">
-                <label for="quickClientPhone">Phone Number:</label>
-                <input type="tel" id="quickClientPhone" name="client_phone" required>
+            <div class="form-group" id="clientNameGroup" style="display: none;">
+                <label for="quickClientName">Client Name *:</label>
+                <input type="text" id="quickClientName" name="client_name">
+                <small style="color: #666;">New client - name required</small>
+            </div>
+            
+            <div id="existingClientInfo" style="display: none; padding: 0.5rem; background: #e8f5e9; border-radius: 4px; margin-bottom: 1rem;">
+                <span style="color: #2e7d32;">✓ Existing client: <strong id="existingClientName"></strong></span>
             </div>
 
             <div class="form-group">
@@ -204,6 +209,39 @@
 </div>
 
 <script>
+// Check if client exists by phone number
+function checkExistingClient() {
+    const phone = document.getElementById('quickClientPhone').value.trim();
+    if (!phone) return;
+    
+    fetch(`/api/check-client?phone=${encodeURIComponent(phone)}`)
+        .then(response => response.json())
+        .then(data => {
+            const nameGroup = document.getElementById('clientNameGroup');
+            const existingInfo = document.getElementById('existingClientInfo');
+            const nameInput = document.getElementById('quickClientName');
+            
+            if (data.exists) {
+                // Existing client
+                nameGroup.style.display = 'none';
+                existingInfo.style.display = 'block';
+                document.getElementById('existingClientName').textContent = data.name;
+                nameInput.value = data.name;
+                nameInput.removeAttribute('required');
+            } else {
+                // New client
+                nameGroup.style.display = 'block';
+                existingInfo.style.display = 'none';
+                nameInput.value = '';
+                nameInput.setAttribute('required', 'required');
+                nameInput.focus();
+            }
+        })
+        .catch(error => {
+            console.error('Error checking client:', error);
+        });
+}
+
 function openQuickBooking(slot) {
     const barberId = slot.dataset.barberId;
     const barberName = slot.dataset.barberName;
@@ -216,13 +254,22 @@ function openQuickBooking(slot) {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('quickAppointmentTime').value = `${today}T${time}:00`;
     
+    // Reset form state
+    document.getElementById('clientNameGroup').style.display = 'none';
+    document.getElementById('existingClientInfo').style.display = 'none';
+    document.getElementById('quickClientName').removeAttribute('required');
+    
     document.getElementById('quickBookingModal').style.display = 'block';
-    document.getElementById('quickClientName').focus();
+    document.getElementById('quickClientPhone').focus();
 }
 
 function closeQuickBooking() {
     document.getElementById('quickBookingModal').style.display = 'none';
     document.getElementById('quickBookingForm').reset();
+    // Reset form state
+    document.getElementById('clientNameGroup').style.display = 'none';
+    document.getElementById('existingClientInfo').style.display = 'none';
+    document.getElementById('quickClientName').removeAttribute('required');
 }
 
 // Close modal when clicking outside

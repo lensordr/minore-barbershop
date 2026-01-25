@@ -608,7 +608,7 @@ async def edit_appointment(
 
 @app.post("/admin/add-appointment")
 async def add_manual_appointment(
-    client_name: str = Form(...),
+    client_name: str = Form(""),
     client_phone: str = Form(...),
     service_id: int = Form(...),
     barber_id: int = Form(...),
@@ -618,11 +618,29 @@ async def add_manual_appointment(
     db: Session = Depends(get_db)
 ):
     try:
-        # Get or create client account
-        client = crud.get_or_create_client(db, client_phone.strip(), client_name.strip(), "")
+        if not client_phone or client_phone.strip() == "":
+            return {"success": False, "message": "Phone number is required"}
         
-        # Lightning-fast appointment creation
-        appointment_id = crud.create_appointment_lightning_fast(db, client_name, service_id, barber_id, appointment_time, duration, price)
+        phone = client_phone.strip()
+        
+        # Check if client exists
+        existing_client = crud.get_client_by_phone(db, phone)
+        
+        if existing_client:
+            # Use existing client's name
+            final_name = existing_client.name
+            client = existing_client
+        else:
+            # New client - name is required
+            if not client_name or client_name.strip() == "":
+                return {"success": False, "message": "Name is required for new clients"}
+            
+            # Create new client
+            final_name = client_name.strip()
+            client = crud.get_or_create_client(db, phone, final_name, "")
+        
+        # Create appointment
+        appointment_id = crud.create_appointment_lightning_fast(db, final_name, service_id, barber_id, appointment_time, duration, price)
         
         # Link to client account
         appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
@@ -633,17 +651,17 @@ async def add_manual_appointment(
             db.commit()
             print(f"✅ Linked appointment to client: {client.phone}")
         
-        print(f"✅ Manual appointment created: ID={appointment_id}, Name={client_name}, Phone={client_phone}, Barber={barber_id}, Time={appointment_time}")
+        print(f"✅ Manual appointment created: ID={appointment_id}, Name={final_name}, Phone={phone}, Barber={barber_id}, Time={appointment_time}")
         
         # Trigger dashboard refresh
         global last_booking_time
         import time
         last_booking_time = time.time()
         
-        return {"success": True, "message": f"Appointment added for {client_name}"}
+        return {"success": True, "message": f"Appointment added for {final_name}"}
     except Exception as e:
         print(f"Error creating appointment: {e}")
-        return {"success": False, "message": "Error creating appointment"}
+        return {"success": False, "message": str(e)}
 
 @app.post("/admin/update-schedule")
 async def update_schedule(
@@ -729,6 +747,15 @@ async def admin_logout():
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie("admin_logged_in")
     return response
+
+@app.get("/api/check-client")
+async def check_client(phone: str, db: Session = Depends(get_db)):
+    """Check if client exists by phone number"""
+    client = crud.get_client_by_phone(db, phone.strip())
+    if client:
+        return {"exists": True, "name": client.name, "email": client.email}
+    else:
+        return {"exists": False}
 
 @app.get("/api/available-times/{barber_id}/{service_id}")
 async def get_available_times(barber_id: int, service_id: int, db: Session = Depends(get_db)):
