@@ -27,6 +27,34 @@ def get_or_create_client(db: Session, phone: str, name: str = "", email: str = "
     
     return client
 
+def get_all_clients(db: Session):
+    """Get all clients with appointment counts"""
+    from sqlalchemy import func
+    clients = db.query(models.Client).all()
+    
+    for client in clients:
+        # Count total appointments
+        client.total_appointments = db.query(models.Appointment).filter(
+            models.Appointment.client_id == client.id
+        ).count()
+        
+        # Count completed appointments
+        client.completed_appointments = db.query(models.Appointment).filter(
+            models.Appointment.client_id == client.id,
+            models.Appointment.status == "completed"
+        ).count()
+    
+    return clients
+
+def toggle_client_block(db: Session, client_id: int):
+    """Toggle client blocked status"""
+    client = db.query(models.Client).filter(models.Client.id == client_id).first()
+    if client:
+        client.blocked = 1 - client.blocked  # Toggle between 0 and 1
+        db.commit()
+        db.refresh(client)
+    return client
+
 def get_client_by_phone(db: Session, phone: str):
     """Get client by phone number"""
     return db.query(models.Client).filter(models.Client.phone == phone).first()
@@ -96,6 +124,11 @@ def delete_service(db: Session, service_id: int):
 def create_appointment(db: Session, client_name: str, email: str, phone: str, service_id: int, barber_id: int, appointment_time: str):
     if not phone or phone.strip() == "":
         raise ValueError("Phone number is required")
+    
+    # Check if client is blocked
+    client = get_client_by_phone(db, phone)
+    if client and client.blocked:
+        raise ValueError("This client is blocked and cannot make appointments")
     
     appointment_dt = datetime.fromisoformat(appointment_time)
     now = datetime.now()

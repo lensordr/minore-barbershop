@@ -12,6 +12,7 @@ class Client(Base):
     name = Column(String)
     email = Column(String, default="")
     created_at = Column(DateTime)
+    blocked = Column(Integer, default=0)  # 0=active, 1=blocked
     
     appointments = relationship("Appointment", back_populates="client")
 

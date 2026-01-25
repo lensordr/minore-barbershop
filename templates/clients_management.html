@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Client Management - MINORE BARBER{% endblock %}
+
+{% block header %}
+<nav class="admin-nav">
+    <a href="/admin/dashboard?location={{ location_id }}">Dashboard</a>
+    <a href="/admin/staff?location={{ location_id }}">Staff</a>
+    <a href="/admin/clients?location={{ location_id }}" class="active">Clients</a>
+    <a href="/admin/revenue?location={{ location_id }}">Revenue</a>
+    <a href="/admin/logout" class="logout-btn">Logout</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2>Client Management - {{ location }}</h2>
+    
+    <div class="clients-list">
+        <div class="clients-header">
+            <span>Name</span>
+            <span>Phone</span>
+            <span>Appointments</span>
+            <span>Status</span>
+            <span>Actions</span>
+        </div>
+        
+        {% for client in clients %}
+        <div class="client-row{% if client.blocked %} blocked-client{% endif %}">
+            <span class="client-name">{{ client.name or "No name" }}</span>
+            <span class="client-phone">{{ client.phone }}</span>
+            <span class="client-stats">{{ client.completed_appointments }}/{{ client.total_appointments }}</span>
+            <span class="client-status">
+                {% if client.blocked %}
+                    <span class="status-blocked">BLOCKED</span>
+                {% else %}
+                    <span class="status-active">ACTIVE</span>
+                {% endif %}
+            </span>
+            <span class="client-actions">
+                <form method="POST" action="/admin/toggle-client/{{ client.id }}" style="display: inline;">
+                    <input type="hidden" name="location" value="{{ location_id }}">
+                    <button type="submit" class="btn {% if client.blocked %}btn-unblock{% else %}btn-block{% endif %}">
+                        {% if client.blocked %}Unblock{% else %}Block{% endif %}
+                    </button>
+                </form>
+            </span>
+        </div>
+        {% endfor %}
+        
+        {% if not clients %}
+        <div class="no-clients">
+            <p>No clients found.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.clients-list {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.clients-header {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    font-weight: bold;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.client-row {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr 1fr 1fr;
+    gap: 1rem;
+    padding: 1rem;
+    border-bottom: 1px solid #eee;
+    align-items: center;
+}
+
+.client-row:hover {
+    background: #f8f9fa;
+}
+
+.blocked-client {
+    background: #fff5f5;
+    opacity: 0.7;
+}
+
+.client-name {
+    font-weight: 500;
+}
+
+.client-phone {
+    font-family: monospace;
+    color: #666;
+}
+
+.client-stats {
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.status-active {
+    color: #28a745;
+    font-weight: bold;
+}
+
+.status-blocked {
+    color: #dc3545;
+    font-weight: bold;
+}
+
+.btn-block {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.btn-unblock {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.75rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.btn-block:hover {
+    background: #c82333;
+}
+
+.btn-unblock:hover {
+    background: #218838;
+}
+
+.no-clients {
+    padding: 2rem;
+    text-align: center;
+    color: #666;
+}
+
+@media (max-width: 768px) {
+    .clients-header, .client-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .clients-header span, .client-row span {
+        padding: 0.25rem 0;
+    }
+}
+</style>
+{% endblock %}

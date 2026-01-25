@@ -463,6 +463,28 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
         "location_id": location
     })
 
+@app.get("/admin/clients", response_class=HTMLResponse)
+async def clients_management(request: Request, location: int = None, db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    
+    clients = crud.get_all_clients(db)
+    location_name = "Mallorca" if location == 1 else "Concell"
+    
+    return templates.TemplateResponse("clients_management.html", {
+        "request": request,
+        "clients": clients,
+        "location": location_name,
+        "location_id": location
+    })
+
+@app.post("/admin/toggle-client/{client_id}")
+async def toggle_client_block(client_id: int, location: int = Form(None), db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    crud.toggle_client_block(db, client_id)
+    return RedirectResponse(url=f"/admin/clients?location={location}", status_code=303)
+
 @app.get("/admin/staff", response_class=HTMLResponse)
 async def staff_management(request: Request, location: int = None, db: Session = Depends(get_db)):
     if location is None:
@@ -627,6 +649,10 @@ async def add_manual_appointment(
         existing_client = crud.get_client_by_phone(db, phone)
         
         if existing_client:
+            # Check if client is blocked
+            if existing_client.blocked:
+                return {"success": False, "message": "This client is blocked and cannot make appointments"}
+            
             # Use existing client's name
             final_name = existing_client.name
             client = existing_client
