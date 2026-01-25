@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Account Blocked - MINORE BARBERSHOP{% endblock %}
+
+{% block content %}
+<div class="blocked-message">
+    <div class="blocked-icon">🚫</div>
+    <h2>Account Blocked</h2>
+    <p><strong>Your account has been temporarily blocked.</strong></p>
+    
+    <div class="blocked-reason">
+        <h3>Reason:</h3>
+        <p>You didn't arrive to your last appointment without prior cancellation.</p>
+    </div>
+    
+    <div class="unblock-instructions">
+        <h3>To unblock your account:</h3>
+        <ol>
+            <li>📞 <strong>Call the barbershop</strong> to speak with our staff</li>
+            <li>💰 <strong>Pay for the missed appointment</strong></li>
+            <li>✅ <strong>Your account will be reactivated</strong> immediately</li>
+        </ol>
+    </div>
+    
+    <div class="contact-info">
+        <h3>Contact Information:</h3>
+        <p>📍 <strong>Mallorca:</strong> +34 XXX XXX XXX</p>
+        <p>📍 <strong>Concell:</strong> +34 XXX XXX XXX</p>
+        <p>🕒 <strong>Hours:</strong> 11:00 AM - 8:00 PM</p>
+    </div>
+    
+    <div class="blocked-actions">
+        <a href="/client/logout" class="btn btn-secondary">Logout</a>
+        <a href="/locations" class="btn btn-primary">Back to Home</a>
+    </div>
+</div>
+
+<style>
+.blocked-message {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 2rem;
+    text-align: center;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border: 2px solid #dc3545;
+}
+
+.blocked-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+}
+
+.blocked-message h2 {
+    color: #dc3545;
+    margin-bottom: 1rem;
+}
+
+.blocked-reason, .unblock-instructions, .contact-info {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    margin: 1.5rem 0;
+    text-align: left;
+}
+
+.blocked-reason h3, .unblock-instructions h3, .contact-info h3 {
+    color: #dc3545;
+    margin-top: 0;
+    margin-bottom: 1rem;
+}
+
+.unblock-instructions ol {
+    margin: 0;
+    padding-left: 1.5rem;
+}
+
+.unblock-instructions li {
+    margin: 0.75rem 0;
+    line-height: 1.5;
+}
+
+.contact-info p {
+    margin: 0.5rem 0;
+    font-size: 1rem;
+}
+
+.blocked-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 2rem;
+}
+
+.blocked-actions .btn {
+    flex: 1;
+    max-width: 150px;
+}
+</style>
+{% endblock %}

@@ -147,6 +147,13 @@ async def client_login_post(
     existing_client = crud.get_client_by_phone(db, phone)
     
     if existing_client:
+        # Check if client is blocked
+        if existing_client.blocked:
+            return templates.TemplateResponse("client_blocked.html", {
+                "request": request,
+                "client": existing_client
+            })
+        
         # Client exists - login directly
         response = RedirectResponse(url="/client/dashboard", status_code=303)
         response.set_cookie("client_phone", existing_client.phone, max_age=86400*30)
@@ -188,6 +195,13 @@ async def client_book_location(request: Request, location: str, client_phone: st
     if not client:
         return RedirectResponse(url="/client/login", status_code=303)
     
+    # Check if client is blocked
+    if client.blocked:
+        return templates.TemplateResponse("client_blocked.html", {
+            "request": request,
+            "client": client
+        })
+    
     if not check_business_hours():
         location_name = location.title()
         return HTMLResponse(f"<h1>MINORE BARBERSHOP - {location_name.upper()}</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}}</style>")
@@ -219,6 +233,13 @@ async def client_dashboard(request: Request, client_phone: str = Cookie(None), d
     client = crud.get_client_by_phone(db, client_phone)
     if not client:
         return RedirectResponse(url="/client/login", status_code=303)
+    
+    # Check if client is blocked
+    if client.blocked:
+        return templates.TemplateResponse("client_blocked.html", {
+            "request": request,
+            "client": client
+        })
     
     # Get client appointments
     appointments = crud.get_client_appointments(db, client.id)
