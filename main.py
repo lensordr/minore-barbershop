@@ -464,18 +464,19 @@ async def admin_dashboard(request: Request, location: int = None, db: Session = 
     })
 
 @app.get("/admin/clients", response_class=HTMLResponse)
-async def clients_management(request: Request, location: int = None, db: Session = Depends(get_db)):
+async def clients_management(request: Request, phone: str = None, location: int = None, db: Session = Depends(get_db)):
     if location is None:
         location = int(os.environ.get('DEFAULT_LOCATION', 1))
     
-    clients = crud.get_all_clients(db)
+    clients = crud.get_all_clients(db, phone)
     location_name = "Mallorca" if location == 1 else "Concell"
     
     return templates.TemplateResponse("clients_management.html", {
         "request": request,
         "clients": clients,
         "location": location_name,
-        "location_id": location
+        "location_id": location,
+        "phone_filter": phone or ""
     })
 
 @app.post("/admin/toggle-client/{client_id}")

@@ -27,24 +27,14 @@ def get_or_create_client(db: Session, phone: str, name: str = "", email: str = "
     
     return client
 
-def get_all_clients(db: Session):
-    """Get all clients with appointment counts"""
-    from sqlalchemy import func
-    clients = db.query(models.Client).all()
+def get_all_clients(db: Session, phone_filter: str = None):
+    """Get clients with optional phone filter - optimized"""
+    query = db.query(models.Client)
     
-    for client in clients:
-        # Count total appointments
-        client.total_appointments = db.query(models.Appointment).filter(
-            models.Appointment.client_id == client.id
-        ).count()
-        
-        # Count completed appointments
-        client.completed_appointments = db.query(models.Appointment).filter(
-            models.Appointment.client_id == client.id,
-            models.Appointment.status == "completed"
-        ).count()
+    if phone_filter:
+        query = query.filter(models.Client.phone.like(f"%{phone_filter}%"))
     
-    return clients
+    return query.order_by(models.Client.created_at.desc()).limit(100).all()
 
 def toggle_client_block(db: Session, client_id: int):
     """Toggle client blocked status"""
