@@ -26,7 +26,7 @@ async def lifespan(app: FastAPI):
     # Startup
     scheduler.start()
     print("Keep-alive active during business hours (10 AM - 10 PM)")
-    print("MINORE BARBER - Ready for appointments!")
+    print("MINORE BARBER - Ready for appointments! v2")
     yield
     # Shutdown
     try:
