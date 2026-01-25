@@ -190,6 +190,7 @@ async def client_book_location(request: Request, location: str, client_phone: st
         "location_id": location_id,
         "client": client
     })
+@app.get("/client/dashboard", response_class=HTMLResponse)
 async def client_dashboard(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
     if not client_phone:
         return RedirectResponse(url="/client/login", status_code=303)
