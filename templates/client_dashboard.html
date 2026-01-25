@@ -8,7 +8,8 @@
         <h2>Welcome, {{ client.name or "Customer" }}</h2>
         <p>Phone: {{ client.phone }}</p>
         <div class="dashboard-actions">
-            <a href="/{{ location.lower() }}/book" class="btn btn-primary">Book New Appointment</a>
+            <a href="/client/book/mallorca" class="btn btn-primary">Book Mallorca</a>
+            <a href="/client/book/concell" class="btn btn-primary">Book Concell</a>
             <a href="/client/logout" class="btn btn-secondary">Logout</a>
         </div>
     </div>
@@ -66,7 +67,10 @@
         {% if not upcoming_appointments and not past_appointments %}
         <div class="no-appointments">
             <p>You don't have any appointments yet.</p>
-            <a href="/{{ location.lower() }}/book" class="btn btn-primary">Book Your First Appointment</a>
+            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
+                <a href="/client/book/mallorca" class="btn btn-primary">Book Mallorca</a>
+                <a href="/client/book/concell" class="btn btn-primary">Book Concell</a>
+            </div>
         </div>
         {% endif %}
     </div>
