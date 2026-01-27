@@ -111,14 +111,13 @@
                 <span id="selectedTime"></span>
             </div>
             <div class="form-group">
-                <label for="quickClientPhone">Phone Number *:</label>
-                <input type="tel" id="quickClientPhone" name="client_phone" required onblur="checkExistingClient()">
+                <label for="quickClientPhone">Phone Number:</label>
+                <input type="tel" id="quickClientPhone" name="client_phone" onblur="checkExistingClient()">
             </div>
             
-            <div class="form-group" id="clientNameGroup" style="display: none;">
+            <div class="form-group" id="clientNameGroup">
                 <label for="quickClientName">Client Name *:</label>
-                <input type="text" id="quickClientName" name="client_name">
-                <small style="color: #666;">New client - name required</small>
+                <input type="text" id="quickClientName" name="client_name" required>
             </div>
             
             <div id="existingClientInfo" style="display: none; padding: 0.5rem; background: #e8f5e9; border-radius: 4px; margin-bottom: 1rem;">
@@ -170,6 +169,10 @@
                 <label for="editClientName">Client Name:</label>
                 <input type="text" id="editClientName" name="client_name" required>
             </div>
+            <div class="form-group" id="editPhoneGroup" style="display: none;">
+                <label>Phone:</label>
+                <span id="editClientPhone" style="font-family: monospace; color: #666;"></span>
+            </div>
             <div class="form-group">
                 <label>Service:</label>
                 <span id="editServiceName"></span>
@@ -218,24 +221,18 @@ function checkExistingClient() {
     fetch(`/api/check-client?phone=${encodeURIComponent(phone)}`)
         .then(response => response.json())
         .then(data => {
-            const nameGroup = document.getElementById('clientNameGroup');
             const existingInfo = document.getElementById('existingClientInfo');
             const nameInput = document.getElementById('quickClientName');
             
             if (data.exists) {
                 // Existing client
-                nameGroup.style.display = 'none';
                 existingInfo.style.display = 'block';
                 document.getElementById('existingClientName').textContent = data.name;
                 nameInput.value = data.name;
-                nameInput.removeAttribute('required');
             } else {
                 // New client
-                nameGroup.style.display = 'block';
                 existingInfo.style.display = 'none';
                 nameInput.value = '';
-                nameInput.setAttribute('required', 'required');
-                nameInput.focus();
             }
         })
         .catch(error => {
@@ -256,21 +253,17 @@ function openQuickBooking(slot) {
     document.getElementById('quickAppointmentTime').value = `${today}T${time}:00`;
     
     // Reset form state
-    document.getElementById('clientNameGroup').style.display = 'none';
     document.getElementById('existingClientInfo').style.display = 'none';
-    document.getElementById('quickClientName').removeAttribute('required');
     
     document.getElementById('quickBookingModal').style.display = 'block';
-    document.getElementById('quickClientPhone').focus();
+    document.getElementById('quickClientName').focus();
 }
 
 function closeQuickBooking() {
     document.getElementById('quickBookingModal').style.display = 'none';
     document.getElementById('quickBookingForm').reset();
     // Reset form state
-    document.getElementById('clientNameGroup').style.display = 'none';
     document.getElementById('existingClientInfo').style.display = 'none';
-    document.getElementById('quickClientName').removeAttribute('required');
 }
 
 // Close modal when clicking outside
@@ -338,6 +331,25 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
     document.getElementById('editPrice').value = price;
     document.getElementById('editDuration').value = duration;
     document.getElementById('editBarber').value = barberId;
+    
+    // Get appointment details including phone
+    fetch(`/api/appointment-details/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            const phoneGroup = document.getElementById('editPhoneGroup');
+            const phoneSpan = document.getElementById('editClientPhone');
+            
+            if (data.phone && data.phone.trim()) {
+                phoneSpan.textContent = data.phone;
+                phoneGroup.style.display = 'block';
+            } else {
+                phoneGroup.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading appointment details:', error);
+            document.getElementById('editPhoneGroup').style.display = 'none';
+        });
     
     // Show/hide action buttons based on status
     const actionButtons = document.getElementById('appointmentActions');
@@ -437,12 +449,4 @@ setInterval(() => {
         .then(response => response.json())
         .then(data => {
             if (data.refresh_needed) {
-                console.log('New appointment detected - refreshing!');
-                location.reload();
-            }
-            lastCheck = data.timestamp;
-        })
-        .catch(error => console.log('Polling failed:', error));
-}, 3000); // 3 second polling for fast updates
-</script>
-{% endblock %}
+                console.log('New appo

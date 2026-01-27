@@ -652,8 +652,8 @@ async def edit_appointment(
 
 @app.post("/admin/add-appointment")
 async def add_manual_appointment(
-    client_name: str = Form(""),
-    client_phone: str = Form(...),
+    client_name: str = Form(...),
+    client_phone: str = Form(""),
     service_id: int = Form(...),
     barber_id: int = Form(...),
     appointment_time: str = Form(...),
@@ -662,44 +662,34 @@ async def add_manual_appointment(
     db: Session = Depends(get_db)
 ):
     try:
-        if not client_phone or client_phone.strip() == "":
-            return {"success": False, "message": "Phone number is required"}
+        phone = client_phone.strip() if client_phone else ""
+        final_name = client_name.strip()
         
-        phone = client_phone.strip()
-        
-        # Check if client exists
-        existing_client = crud.get_client_by_phone(db, phone)
-        
-        if existing_client:
-            # Check if client is blocked
-            if existing_client.blocked:
+        if phone:
+            # Check if client exists and is blocked
+            existing_client = crud.get_client_by_phone(db, phone)
+            if existing_client and existing_client.blocked:
                 return {"success": False, "message": "This client is blocked and cannot make appointments"}
             
-            # Use existing client's name
-            final_name = existing_client.name
-            client = existing_client
-        else:
-            # New client - name is required
-            if not client_name or client_name.strip() == "":
-                return {"success": False, "message": "Name is required for new clients"}
-            
-            # Create new client
-            final_name = client_name.strip()
+            # Get or create client with phone
             client = crud.get_or_create_client(db, phone, final_name, "")
+        else:
+            # No phone provided - create appointment without client link
+            client = None
         
         # Create appointment
         appointment_id = crud.create_appointment_lightning_fast(db, final_name, service_id, barber_id, appointment_time, duration, price)
         
-        # Link to client account
-        appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
-        if appointment:
-            appointment.client_id = client.id
-            appointment.phone = client.phone
-            appointment.email = client.email
-            db.commit()
-            print(f"✅ Linked appointment to client: {client.phone}")
+        # Link to client account if phone provided
+        if client:
+            appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+            if appointment:
+                appointment.client_id = client.id
+                appointment.phone = client.phone
+                appointment.email = client.email
+                db.commit()
         
-        print(f"✅ Manual appointment created: ID={appointment_id}, Name={final_name}, Phone={phone}, Barber={barber_id}, Time={appointment_time}")
+        print(f"✅ Manual appointment created: ID={appointment_id}, Name={final_name}, Phone={phone or 'None'}, Barber={barber_id}, Time={appointment_time}")
         
         # Trigger dashboard refresh
         global last_booking_time
@@ -795,6 +785,17 @@ async def admin_logout():
     response = RedirectResponse(url="/admin/login", status_code=303)
     response.delete_cookie("admin_logged_in")
     return response
+
+@app.get("/api/appointment-details/{appointment_id}")
+async def get_appointment_details(appointment_id: int, db: Session = Depends(get_db)):
+    """Get appointment details including phone number"""
+    appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
+    if appointment:
+        return {
+            "phone": appointment.phone or "",
+            "email": appointment.email or ""
+        }
+    return {"phone": "", "email": ""}
 
 @app.get("/api/check-client")
 async def check_client(phone: str, db: Session = Depends(get_db)):
