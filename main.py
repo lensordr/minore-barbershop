@@ -452,7 +452,7 @@ async def admin_login_post(username: str = Form(...), password: str = Form(...))
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(request: Request, location: int = None, db: Session = Depends(get_db)):
+async def admin_dashboard(request: Request, location: int = None, db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
     if location is None:
         location = int(os.environ.get('DEFAULT_LOCATION', 1))
     print(f"Dashboard accessed at {datetime.now()} for location {location}")

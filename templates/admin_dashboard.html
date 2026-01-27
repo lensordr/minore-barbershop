@@ -449,4 +449,15 @@ setInterval(() => {
         .then(response => response.json())
         .then(data => {
             if (data.refresh_needed) {
-                console.log('New appo
+                console.log('New appointment detected - refreshing!');
+                location.reload();
+            }
+            lastCheck = data.timestamp;
+        })
+        .catch(error => console.log('Polling failed:', error));
+}, 3000); // 3 second polling for fast updates
+</script>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}
