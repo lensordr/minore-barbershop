@@ -386,7 +386,7 @@ async def create_appointment_helper(
                 try:
                     print(f"Sending confirmation email to: {client_email}")
                     location_name = "Mallorca" if location_id == 1 else "Concell"
-                    success = send_appointment_email(client_email, client_name, appointment.appointment_time, service.name, barber.name, appointment.cancel_token, location_name)
+                    success = send_appointment_email(client_email, client_name, service.name, barber.name, appointment.appointment_time, appointment.cancel_token, location_name)
                     print(f"Email result: {success}")
                 except Exception as e:
                     print(f"Email error: {e}")
