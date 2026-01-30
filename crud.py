@@ -204,7 +204,7 @@ def create_appointment_admin(db: Session, client_name: str, phone: str, service_
 def create_appointment_lightning_fast(db: Session, client_name: str, service_id: int, barber_id: int, appointment_time: str, duration: int, price: float):
     appointment_dt = datetime.fromisoformat(appointment_time)
     
-    # CRITICAL: Check for ANY overlapping appointments with exact time matching
+    # CRITICAL: Check for exact time conflicts first
     existing = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
         models.Appointment.appointment_time == appointment_dt,
@@ -214,19 +214,26 @@ def create_appointment_lightning_fast(db: Session, client_name: str, service_id:
     if existing:
         raise ValueError(f"Time slot already booked by {existing.client_name} at {existing.appointment_time.strftime('%H:%M')}")
     
-    # Additional overlap check for duration conflicts
+    # Check for overlapping appointments manually
     service_duration = duration
     appointment_end = appointment_dt + timedelta(minutes=service_duration)
     
-    overlapping = db.query(models.Appointment).filter(
+    # Get all appointments for this barber today
+    all_appointments = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
         models.Appointment.status != "cancelled",
-        models.Appointment.appointment_time < appointment_end,
-        models.Appointment.appointment_time + timedelta(minutes=models.Appointment.custom_duration or 30) > appointment_dt
-    ).first()
+        models.Appointment.appointment_time >= appointment_dt.date(),
+        models.Appointment.appointment_time < appointment_dt.date() + timedelta(days=1)
+    ).all()
     
-    if overlapping:
-        raise ValueError(f"Time conflicts with {overlapping.client_name} at {overlapping.appointment_time.strftime('%H:%M')}")
+    # Check each appointment for overlap
+    for apt in all_appointments:
+        apt_duration = apt.custom_duration or apt.service.duration
+        apt_end = apt.appointment_time + timedelta(minutes=apt_duration)
+        
+        # Check if appointments overlap
+        if (appointment_dt < apt_end and appointment_end > apt.appointment_time):
+            raise ValueError(f"Time conflicts with {apt.client_name} at {apt.appointment_time.strftime('%H:%M')}")
     
     # Safe appointment creation
     appointment = models.Appointment(
