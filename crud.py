@@ -204,23 +204,29 @@ def create_appointment_admin(db: Session, client_name: str, phone: str, service_
 def create_appointment_lightning_fast(db: Session, client_name: str, service_id: int, barber_id: int, appointment_time: str, duration: int, price: float):
     appointment_dt = datetime.fromisoformat(appointment_time)
     
-    # CRITICAL: Check for ANY overlapping appointments
+    # CRITICAL: Check for ANY overlapping appointments with exact time matching
+    existing = db.query(models.Appointment).filter(
+        models.Appointment.barber_id == barber_id,
+        models.Appointment.appointment_time == appointment_dt,
+        models.Appointment.status != "cancelled"
+    ).first()
+    
+    if existing:
+        raise ValueError(f"Time slot already booked by {existing.client_name} at {existing.appointment_time.strftime('%H:%M')}")
+    
+    # Additional overlap check for duration conflicts
     service_duration = duration
     appointment_end = appointment_dt + timedelta(minutes=service_duration)
     
-    existing = db.query(models.Appointment).filter(
+    overlapping = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
-        models.Appointment.status != "cancelled"
-    ).all()
+        models.Appointment.status != "cancelled",
+        models.Appointment.appointment_time < appointment_end,
+        models.Appointment.appointment_time + timedelta(minutes=models.Appointment.custom_duration or 30) > appointment_dt
+    ).first()
     
-    # Check for time conflicts
-    for existing_apt in existing:
-        existing_duration = existing_apt.custom_duration or existing_apt.service.duration
-        existing_end = existing_apt.appointment_time + timedelta(minutes=existing_duration)
-        
-        # Check if appointments overlap
-        if (appointment_dt < existing_end and appointment_end > existing_apt.appointment_time):
-            raise ValueError(f"Time slot conflicts with {existing_apt.client_name} at {existing_apt.appointment_time.strftime('%H:%M')}")
+    if overlapping:
+        raise ValueError(f"Time conflicts with {overlapping.client_name} at {overlapping.appointment_time.strftime('%H:%M')}")
     
     # Safe appointment creation
     appointment = models.Appointment(
@@ -250,16 +256,15 @@ def get_today_appointments_ordered_by_location(db: Session, location_id: int):
     appointments = db.query(models.Appointment).join(models.Barber).filter(
         models.Appointment.appointment_time >= today,
         models.Appointment.appointment_time < today + timedelta(days=1),
-        models.Appointment.status != "cancelled",
         models.Barber.location_id == location_id
-        # Removed active filter - show all appointments but mark inactive ones
-    ).order_by(models.Appointment.appointment_time).all()
+        # Show ALL appointments including cancelled for admin visibility
+    ).order_by(models.Appointment.appointment_time, models.Appointment.id).all()
     
     # Debug logging
     print(f"📋 Loading {len(appointments)} appointments for location {location_id}:")
     for apt in appointments:
         barber_status = "active" if apt.barber.active else "inactive"
-        print(f"  - ID={apt.id}, Name={apt.client_name}, Barber={apt.barber_id}({barber_status}), Time={apt.appointment_time.strftime('%H:%M')}, is_online={apt.is_online}")
+        print(f"  - ID={apt.id}, Name={apt.client_name}, Barber={apt.barber_id}({barber_status}), Time={apt.appointment_time.strftime('%H:%M')}, Status={apt.status}")
     
     return appointments
 
