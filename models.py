@@ -99,4 +99,8 @@ class DailyRevenue(Base):
     id = Column(Integer, primary_key=True, index=True)
     barber_id = Column(Integer, ForeignKey("barbers.id"))
     date = Column(String)  # YYYY-MM-DD format
-    revenue = Column(Float, default=
+    revenue = Column(Float, default=0.0)
+    appointments_count = Column(Integer, default=0)
+    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
+    
+    barber = relationship("Barber")
