@@ -13,16 +13,16 @@
         {% endif %}
         
         <form method="POST" action="/client/login">
-            <input type="hidden" name="location" value="{{ location or 'mallorca' }}">
             <div class="form-group">
                 <label for="phone">Phone Number *</label>
-                <input type="tel" id="phone" name="phone" placeholder="+34 123 456 789" value="{{ phone or '' }}" required>
+                <input type="tel" id="phone" name="phone" placeholder="+34 123 456 789" value="{{ phone or '' }}" required {% if show_name_field %}readonly{% endif %}>
                 <small>We'll use this to find your appointments</small>
             </div>
             
+            {% if show_name_field %}
             <div class="form-group">
-                <label for="name">Full Name</label>
-                <input type="text" id="name" name="name" placeholder="Your full name" value="{{ name or '' }}">
+                <label for="name">Full Name *</label>
+                <input type="text" id="name" name="name" placeholder="Your full name" value="{{ name or '' }}" required autofocus>
                 <small>Required for new accounts</small>
             </div>
             
@@ -31,14 +31,17 @@
                 <input type="email" id="email" name="email" placeholder="your@email.com" value="{{ email or '' }}">
                 <small>For appointment confirmations</small>
             </div>
+            {% endif %}
             
             <button type="submit" class="btn btn-primary">Continue</button>
         </form>
         
+        {% if not show_name_field %}
         <div class="info-box">
             <h3>New Customer?</h3>
-            <p>Just enter your phone number and name - we'll create your account automatically!</p>
+            <p>Just enter your phone number - we'll ask for your name if you're new!</p>
         </div>
+        {% endif %}
     </div>
 </div>
 
@@ -76,6 +79,11 @@
     background: #1d1a1c;
     color: #fbcc93;
     font-size: 1rem;
+}
+
+.form-group input[readonly] {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .form-group small {

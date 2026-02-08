@@ -92,7 +92,7 @@ def check_business_hours():
 async def home(request: Request):
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
-    return templates.TemplateResponse("home.html", {"request": request})
+    return RedirectResponse(url="/client/login", status_code=303)
 
 @app.get("/locations", response_class=HTMLResponse)
 async def location_selector(request: Request):
@@ -108,6 +108,9 @@ async def photos(location: str, filename: str):
 
 @app.get("/mallorca/book", response_class=HTMLResponse)
 async def book_appointment_mallorca(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+    
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP - MALLORCA</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
     
@@ -115,14 +118,12 @@ async def book_appointment_mallorca(request: Request, client_phone: str = Cookie
     if not schedule.is_open:
         return HTMLResponse("<h1>MINORE BARBERSHOP - MALLORCA</h1><p>We are temporarily closed. Please check back later.</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
     
-    # Always require fresh login - no cookies
-    return RedirectResponse(url="/client/login?location=mallorca", status_code=303)
+    return RedirectResponse(url="/client/book/mallorca", status_code=303)
 
 @app.get("/client/login", response_class=HTMLResponse)
-async def client_login(request: Request, location: str = None):
+async def client_login(request: Request):
     return templates.TemplateResponse("client_login.html", {
-        "request": request,
-        "location": location
+        "request": request
     })
 
 @app.post("/client/login")
@@ -131,14 +132,12 @@ async def client_login_post(
     phone: str = Form(...),
     name: str = Form(""),
     email: str = Form(""),
-    location: str = Form("mallorca"),
     db: Session = Depends(get_db)
 ):
     if not phone or phone.strip() == "":
         return templates.TemplateResponse("client_login.html", {
             "request": request,
-            "error": "Phone number is required",
-            "location": location
+            "error": "Phone number is required"
         })
     
     phone = phone.strip()
@@ -154,8 +153,8 @@ async def client_login_post(
                 "client": existing_client
             })
         
-        # Client exists - login directly
-        response = RedirectResponse(url="/client/dashboard", status_code=303)
+        # Client exists - go to location selector
+        response = RedirectResponse(url="/locations", status_code=303)
         response.set_cookie("client_phone", existing_client.phone, max_age=86400*30)
         return response
     else:
@@ -164,18 +163,21 @@ async def client_login_post(
             return templates.TemplateResponse("client_login.html", {
                 "request": request,
                 "error": "Name is required for new accounts",
-                "location": location,
                 "phone": phone,
-                "email": email
+                "email": email,
+                "show_name_field": True
             })
         
         # Create new client
         client = crud.get_or_create_client(db, phone, name.strip(), email.strip())
-        response = RedirectResponse(url="/client/dashboard", status_code=303)
+        response = RedirectResponse(url="/locations", status_code=303)
         response.set_cookie("client_phone", client.phone, max_age=86400*30)
         return response
 @app.get("/concell/book", response_class=HTMLResponse)
 async def book_appointment_concell(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+    
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
     
@@ -183,8 +185,7 @@ async def book_appointment_concell(request: Request, client_phone: str = Cookie(
     if not schedule.is_open:
         return HTMLResponse("<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are temporarily closed. Please check back later.</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
     
-    # Always require fresh login - no cookies
-    return RedirectResponse(url="/client/login?location=concell", status_code=303)
+    return RedirectResponse(url="/client/book/concell", status_code=303)
 
 @app.get("/client/book/{location}", response_class=HTMLResponse)
 async def client_book_location(request: Request, location: str, vip_code: str = "", client_phone: str = Cookie(None), db: Session = Depends(get_db)):
@@ -998,47 +999,4 @@ async def debug_luca_appointments(db: Session = Depends(get_db)):
 @app.get("/debug/luca-1300")
 async def debug_luca_1300(db: Session = Depends(get_db)):
     from datetime import datetime, timedelta
-    today = datetime.now().date()
-    target_time = datetime.combine(today, datetime.min.time().replace(hour=13, minute=0))
-    
-    # Find Luca's barber ID
-    luca = db.query(models.Barber).filter(models.Barber.name == "Luca").first()
-    if not luca:
-        return {"error": "Luca not found"}
-    
-    # Get appointments for Luca at 13:00
-    appointments = db.query(models.Appointment).filter(
-        models.Appointment.barber_id == luca.id,
-        models.Appointment.appointment_time >= target_time,
-        models.Appointment.appointment_time < target_time + timedelta(hours=1)
-    ).all()
-    
-    result = []
-    for apt in appointments:
-        result.append({
-            "id": apt.id,
-            "client_name": apt.client_name,
-            "time": apt.appointment_time.strftime("%H:%M"),
-            "status": apt.status,
-            "is_online": apt.is_online,
-            "service": apt.service.name,
-            "created_at": str(apt.id)  # ID shows creation order
-        })
-    
-    return {"luca_appointments_1300": result, "count": len(result)}
-
-@app.get("/export-data")
-async def export_data(db: Session = Depends(get_db)):
-    barbers = db.query(models.Barber).all()
-    services = db.query(models.Service).all()
-    
-    return {
-        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
-        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
-    }
-
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
-# v1.0
+    today =
