@@ -312,6 +312,12 @@ function submitQuickBooking(event) {
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creating...';
     
+    // Save current barber selection
+    const currentBarber = document.getElementById('mobileBarberSelect')?.value;
+    if (currentBarber) {
+        localStorage.setItem('selectedBarber', currentBarber);
+    }
+    
     fetch('/admin/add-appointment', {
         method: 'POST',
         body: formData
@@ -473,6 +479,11 @@ setInterval(() => {
 
 // Mobile view: Show barber selector and filter columns
 function filterByBarber(barberId) {
+    // Save selection to localStorage
+    if (barberId) {
+        localStorage.setItem('selectedBarber', barberId);
+    }
+    
     const headers = document.querySelectorAll('.barber-header');
     const cells = document.querySelectorAll('.appointment-cell');
     
@@ -504,11 +515,21 @@ function filterByBarber(barberId) {
 if (window.innerWidth <= 768) {
     document.querySelector('.mobile-barber-selector').style.display = 'block';
     document.querySelector('.scroll-indicator').style.display = 'none';
-    // Default to Luca on mobile
-    const lucaOption = Array.from(document.getElementById('mobileBarberSelect').options).find(opt => opt.text.includes('Luca'));
-    if (lucaOption) {
-        document.getElementById('mobileBarberSelect').value = lucaOption.value;
-        filterByBarber(lucaOption.value);
+    
+    // Restore saved barber or default to Luca
+    const savedBarber = localStorage.getItem('selectedBarber');
+    const selectElement = document.getElementById('mobileBarberSelect');
+    
+    if (savedBarber && selectElement.querySelector(`option[value="${savedBarber}"]`)) {
+        selectElement.value = savedBarber;
+        filterByBarber(savedBarber);
+    } else {
+        // Default to Luca on first load
+        const lucaOption = Array.from(selectElement.options).find(opt => opt.text.includes('Luca'));
+        if (lucaOption) {
+            selectElement.value = lucaOption.value;
+            filterByBarber(lucaOption.value);
+        }
     }
 }
 
