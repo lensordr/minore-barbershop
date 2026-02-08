@@ -996,7 +996,17 @@ async def debug_luca_appointments(db: Session = Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
 
-@app.get("/debug/luca-1300")
-async def debug_luca_1300(db: Session = Depends(get_db)):
-    from datetime import datetime, timedelta
-    today =
+@app.get("/export-data")
+async def export_data(db: Session = Depends(get_db)):
+    barbers = db.query(models.Barber).all()
+    services = db.query(models.Service).all()
+    
+    return {
+        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
+        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
+    }
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
