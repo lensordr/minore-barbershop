@@ -435,6 +435,7 @@ function cancelAppointment() {
         const appointmentId = document.getElementById('editAppointmentId').value;
         
         fetch(`/admin/cancel/${appointmentId}`, { method: 'POST' })
+        .then(response => response.json())
         .then(() => {
             closeEditAppointment();
             location.reload();
@@ -503,6 +504,12 @@ function filterByBarber(barberId) {
 if (window.innerWidth <= 768) {
     document.querySelector('.mobile-barber-selector').style.display = 'block';
     document.querySelector('.scroll-indicator').style.display = 'none';
+    // Default to Luca on mobile
+    const lucaOption = Array.from(document.getElementById('mobileBarberSelect').options).find(opt => opt.text.includes('Luca'));
+    if (lucaOption) {
+        document.getElementById('mobileBarberSelect').value = lucaOption.value;
+        filterByBarber(lucaOption.value);
+    }
 }
 
 window.addEventListener('resize', () => {
