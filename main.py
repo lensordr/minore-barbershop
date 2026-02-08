@@ -999,4 +999,22 @@ async def debug_luca_1300(db: Session = Depends(get_db)):
             "status": apt.status,
             "is_online": apt.is_online,
             "service": apt.service.name,
-            "created_at": str(apt.id)  # ID shows creation 
+            "created_at": str(apt.id)  # ID shows creation order
+        })
+    
+    return {"luca_appointments_1300": result, "count": len(result)}
+
+@app.get("/export-data")
+async def export_data(db: Session = Depends(get_db)):
+    barbers = db.query(models.Barber).all()
+    services = db.query(models.Service).all()
+    
+    return {
+        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
+        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
+    }
+
+if __name__ == "__main__":
+    import os
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
