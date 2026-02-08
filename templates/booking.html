@@ -32,7 +32,7 @@
         <div class="form-group">
             <label for="vip_code">VIP Code (Optional - For Early Access):</label>
             <input type="text" id="vip_code" name="vip_code" placeholder="Enter VIP code" value="{{ vip_code or '' }}" style="text-transform: uppercase;" onchange="applyVipCode()">
-            <small style="color: #666; display: block; margin-top: 0.25rem;">Have a VIP code? Book before 11 AM with special pricing!</small>
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Have a VIP code? Book 24 hours in advance!</small>
         </div>
 
         
@@ -140,6 +140,7 @@ function updateAvailableTimes() {
     const barberId = document.getElementById('barber_id').value;
     const serviceId = document.getElementById('service_id').value;
     const timeSelect = document.getElementById('appointment_time');
+    const vipCode = document.getElementById('vip_code')?.value || '';
     
     if (barberId && serviceId) {
         timeSelect.innerHTML = '<option value="">Loading times...</option>';
@@ -155,7 +156,7 @@ function updateAvailableTimes() {
             
             barberItems.forEach(item => {
                 const barberId = item.getAttribute('data-barber-id');
-                fetch(`/api/available-times/${barberId}/${serviceId}?t=${Date.now()}`)
+                fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&t=${Date.now()}`)
                     .then(response => response.json())
                     .then(times => {
                         times.forEach(time => allTimes.add(time));
@@ -191,7 +192,7 @@ function updateAvailableTimes() {
                     });
             });
         } else {
-            fetch(`/api/available-times/${barberId}/${serviceId}?t=${Date.now()}`)
+            fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&t=${Date.now()}`)
                 .then(response => response.json())
                 .then(times => {
                     timeSelect.innerHTML = '<option value="">Select a time</option>';

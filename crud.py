@@ -324,7 +324,7 @@ def get_today_appointment_counts_by_location(db: Session, location_id: int):
     
     return {"total": total, "completed": completed, "cancelled": cancelled}
 
-def get_available_times_for_service(db: Session, barber_id: int, service_id: int):
+def get_available_times_for_service(db: Session, barber_id: int, service_id: int, is_vip: bool = False):
     now = datetime.now()
     today = now.date()
     
@@ -345,15 +345,18 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     
     service_duration = service.duration
     
-    # If it's after business hours, show tomorrow's slots
-    if now.hour >= schedule.end_hour:
-        today = today + timedelta(days=1)
-        # Skip Sunday when moving to next day
-        if today.weekday() == 6:
+    # VIP users can book 24 hours in advance (tomorrow)
+    if is_vip:
+        tomorrow = today + timedelta(days=1)
+        if tomorrow.weekday() == 6:  # Skip Sunday
             return []
-        start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
-        end_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.end_hour))
+        start_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.start_hour))
+        end_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.end_hour))
         earliest_time = start_time
+    # Regular users: same day only
+    elif now.hour >= schedule.end_hour:
+        # After hours - no slots available for regular users
+        return []
     else:
         start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
         end_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.end_hour))
@@ -380,7 +383,7 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
         if earliest_time < min_booking_time:
             earliest_time = min_booking_time
     
-    # Get existing appointments for this barber today (exclude cancelled)
+    # Get existing appointments for this barber on target day (exclude cancelled)
     existing_appointments = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
         models.Appointment.appointment_time >= start_time,
