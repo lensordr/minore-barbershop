@@ -187,7 +187,7 @@ async def book_appointment_concell(request: Request, client_phone: str = Cookie(
     return RedirectResponse(url="/client/login?location=concell", status_code=303)
 
 @app.get("/client/book/{location}", response_class=HTMLResponse)
-async def client_book_location(request: Request, location: str, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
+async def client_book_location(request: Request, location: str, vip_code: str = "", client_phone: str = Cookie(None), db: Session = Depends(get_db)):
     if not client_phone:
         return RedirectResponse(url="/client/login", status_code=303)
     
@@ -217,13 +217,25 @@ async def client_book_location(request: Request, location: str, client_phone: st
     services = crud.get_services_by_location(db, location_id)
     barbers = crud.get_active_barbers_by_location(db, location_id)
     
+    # Filter barbers by VIP code if provided
+    vip_barber = None
+    if vip_code and vip_code.strip():
+        vip_code_upper = vip_code.strip().upper()
+        if vip_code_upper.startswith("VIP"):
+            barber_name = vip_code_upper[3:]  # Remove "VIP" prefix
+            vip_barber = next((b for b in barbers if b.name.upper() == barber_name and b.early_access_enabled), None)
+            if vip_barber:
+                barbers = [vip_barber]  # Show only VIP barber
+    
     return templates.TemplateResponse("booking.html", {
         "request": request, 
         "services": services, 
         "barbers": barbers,
         "location": location_name,
         "location_id": location_id,
-        "client": client
+        "client": client,
+        "vip_code": vip_code,
+        "vip_barber": vip_barber
     })
 @app.get("/client/dashboard", response_class=HTMLResponse)
 async def client_dashboard(request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)):
@@ -311,11 +323,12 @@ async def client_book_appointment(
     service_id: int = Form(...),
     barber_id: str = Form(...),
     appointment_time: str = Form(...),
+    vip_code: str = Form(""),
     client_phone_cookie: str = Cookie(None, alias="client_phone"),
     db: Session = Depends(get_db)
 ):
     location_id = 1 if location.lower() == "mallorca" else 2
-    return await create_appointment_helper(request, client_name, client_email, client_phone, service_id, barber_id, appointment_time, location_id, db)
+    return await create_appointment_helper(request, client_name, client_email, client_phone, service_id, barber_id, appointment_time, location_id, vip_code, db)
 async def book_appointment_redirect(request: Request, db: Session = Depends(get_db)):
     default_location = int(os.environ.get('DEFAULT_LOCATION', 1))
     if default_location == 1:
@@ -358,6 +371,7 @@ async def create_appointment_helper(
     barber_id: str,
     appointment_time: str,
     location_id: int,
+    vip_code: str,
     db: Session
 ):
     try:

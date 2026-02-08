@@ -31,7 +31,7 @@
         
         <div class="form-group">
             <label for="vip_code">VIP Code (Optional - For Early Access):</label>
-            <input type="text" id="vip_code" name="vip_code" placeholder="Enter VIP code" style="text-transform: uppercase;">
+            <input type="text" id="vip_code" name="vip_code" placeholder="Enter VIP code" value="{{ vip_code or '' }}" style="text-transform: uppercase;" onchange="applyVipCode()">
             <small style="color: #666; display: block; margin-top: 0.25rem;">Have a VIP code? Book before 11 AM with special pricing!</small>
         </div>
 
@@ -114,6 +114,15 @@
 }
 </style>
 <script>
+function applyVipCode() {
+    const vipCode = document.getElementById('vip_code').value.trim();
+    if (vipCode) {
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('vip_code', vipCode);
+        window.location.href = currentUrl.toString();
+    }
+}
+
 function updateAvailableTimes() {
     // Check if current time is before 11 AM
     const now = new Date();
