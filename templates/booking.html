@@ -48,6 +48,16 @@
             </select>
         </div>
         
+        {% if vip_barber %}
+        <div class="form-group" id="vipDateSelector">
+            <label for="appointment_date">Select Date</label>
+            <select id="appointment_date" name="appointment_date" onchange="updateAvailableTimes()">
+                <option value="today">Today</option>
+                <option value="tomorrow" selected>Tomorrow (VIP Early Access)</option>
+            </select>
+        </div>
+        {% endif %}
+        
         <div class="form-group">
             <label>Choose Your Barber</label>
             <div class="barber-list">
@@ -174,9 +184,22 @@ function updateAvailableTimes() {
                                 const timeInMinutes = hour * 60 + minute;
                                 const currentTimeInMinutes = currentHour * 60 + currentMinute;
                                 
-                                if (timeInMinutes > currentTimeInMinutes) {
-                                    const today = new Date().toISOString().split('T')[0];
-                                    const datetime = `${today}T${time}:00`;
+                                // Get selected date (today or tomorrow)
+                                const dateSelector = document.getElementById('appointment_date');
+                                let targetDate = new Date();
+                                if (dateSelector && dateSelector.value === 'tomorrow') {
+                                    targetDate.setDate(targetDate.getDate() + 1);
+                                }
+                                const dateStr = targetDate.toISOString().split('T')[0];
+                                
+                                // For today, only show future times; for tomorrow, show all
+                                if (!dateSelector || dateSelector.value === 'today') {
+                                    if (timeInMinutes > currentTimeInMinutes) {
+                                        const datetime = `${dateStr}T${time}:00`;
+                                        timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
+                                    }
+                                } else {
+                                    const datetime = `${dateStr}T${time}:00`;
                                     timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
                                 }
                             });
@@ -205,10 +228,22 @@ function updateAvailableTimes() {
                         const timeInMinutes = hour * 60 + minute;
                         const currentTimeInMinutes = currentHour * 60 + currentMinute;
                         
-                        // Only show times that are in the future
-                        if (timeInMinutes > currentTimeInMinutes) {
-                            const today = new Date().toISOString().split('T')[0];
-                            const datetime = `${today}T${time}:00`;
+                        // Get selected date (today or tomorrow)
+                        const dateSelector = document.getElementById('appointment_date');
+                        let targetDate = new Date();
+                        if (dateSelector && dateSelector.value === 'tomorrow') {
+                            targetDate.setDate(targetDate.getDate() + 1);
+                        }
+                        const dateStr = targetDate.toISOString().split('T')[0];
+                        
+                        // For today, only show future times; for tomorrow, show all
+                        if (!dateSelector || dateSelector.value === 'today') {
+                            if (timeInMinutes > currentTimeInMinutes) {
+                                const datetime = `${dateStr}T${time}:00`;
+                                timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
+                            }
+                        } else {
+                            const datetime = `${dateStr}T${time}:00`;
                             timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
                         }
                     });

@@ -334,10 +334,6 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     if not schedule.is_open:
         return []  # No times available when schedule is closed
     
-    # Block Sunday bookings (weekday 6 = Sunday)
-    if today.weekday() == 6:
-        return []  # No times available on Sunday
-    
     # Get service duration
     service = db.query(models.Service).filter(models.Service.id == service_id).first()
     if not service:
@@ -345,19 +341,24 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     
     service_duration = service.duration
     
-    # VIP users can book 24 hours in advance (tomorrow)
+    # VIP users can book for tomorrow
     if is_vip:
         tomorrow = today + timedelta(days=1)
         if tomorrow.weekday() == 6:  # Skip Sunday
             return []
         start_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.start_hour))
         end_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.end_hour))
-        earliest_time = start_time
+        earliest_time = start_time  # VIP can book from opening time tomorrow
     # Regular users: same day only
-    elif now.hour >= schedule.end_hour:
-        # After hours - no slots available for regular users
-        return []
     else:
+        # Block Sunday bookings
+        if today.weekday() == 6:
+            return []
+        
+        if now.hour >= schedule.end_hour:
+            # After hours - no slots available for regular users
+            return []
+        
         start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
         end_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.end_hour))
         
@@ -378,7 +379,7 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
         else:
             earliest_time = datetime.combine(today, datetime.min.time().replace(hour=next_hour, minute=next_minute))
         
-        # Client restriction: cannot book before 11 AM (but admin can override)
+        # Client restriction: cannot book before 11 AM
         min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=11, minute=0))
         if earliest_time < min_booking_time:
             earliest_time = min_booking_time

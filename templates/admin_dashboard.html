@@ -525,4 +525,26 @@ if (window.innerWidth <= 768) {
         filterByBarber(savedBarber);
     } else {
         // Default to Luca on first load
-        const lucaOption = Array.from(selectElement.options).find(opt => opt.text.inclu
+        const lucaOption = Array.from(selectElement.options).find(opt => opt.text.includes('Luca'));
+        if (lucaOption) {
+            selectElement.value = lucaOption.value;
+            filterByBarber(lucaOption.value);
+        }
+    }
+}
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth <= 768) {
+        document.querySelector('.mobile-barber-selector').style.display = 'block';
+        document.querySelector('.scroll-indicator').style.display = 'none';
+    } else {
+        document.querySelector('.mobile-barber-selector').style.display = 'none';
+        document.querySelector('.scroll-indicator').style.display = 'block';
+        filterByBarber('all'); // Reset to show all
+    }
+});
+</script>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}
