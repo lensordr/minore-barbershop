@@ -111,7 +111,7 @@ def delete_service(db: Session, service_id: int):
         db.commit()
     return service
 
-def create_appointment(db: Session, client_name: str, email: str, phone: str, service_id: int, barber_id: int, appointment_time: str):
+def create_appointment(db: Session, client_name: str, email: str, phone: str, service_id: int, barber_id: int, appointment_time: str, vip_extra_price: float = 0):
     if not phone or phone.strip() == "":
         raise ValueError("Phone number is required")
     
@@ -168,6 +168,9 @@ def create_appointment(db: Session, client_name: str, email: str, phone: str, se
     from email_service import generate_cancel_token
     cancel_token = generate_cancel_token()
     
+    # Calculate final price with VIP extra
+    final_price = service.price + vip_extra_price if vip_extra_price > 0 else None
+    
     appointment = models.Appointment(
         client_id=client.id,
         appointment_time=appointment_dt,
@@ -175,6 +178,7 @@ def create_appointment(db: Session, client_name: str, email: str, phone: str, se
         barber_id=barber_id,
         cancel_token=cancel_token,
         is_online=1,
+        custom_price=final_price,
         # Legacy fields for compatibility
         client_name=client_name,
         phone=phone,
