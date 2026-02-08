@@ -42,7 +42,7 @@
                 <option value="">Select a service</option>
                 {% for service in services %}
                 <option value="{{ service.id }}" data-price="{{ service.price }}" data-duration="{{ service.duration }}">
-                    {{ service.name }} - €{{ service.price }} ({{ service.duration }}min)
+                    {{ service.name }} - €{% if vip_barber %}{{ service.price + vip_barber.early_access_price_add }}{% else %}{{ service.price }}{% endif %} ({{ service.duration }}min)
                 </option>
                 {% endfor %}
             </select>
