@@ -19,6 +19,17 @@
     <div class="success-message" style="background: #d4edda; color: #155724; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;">{{ message }}</div>
     {% endif %}
     
+    <!-- Mobile Barber Selector -->
+    <div class="mobile-barber-selector" style="display: none;">
+        <label for="mobileBarberSelect" style="color: #fbcc93; font-weight: bold; margin-bottom: 0.5rem; display: block;">Select Barber:</label>
+        <select id="mobileBarberSelect" onchange="filterByBarber(this.value)" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fbcc93; font-size: 1rem;">
+            <option value="all">All Barbers</option>
+            {% for barber in all_barbers %}
+            <option value="{{ barber.id }}">{{ barber.name }}{% if not barber.active %} (Closed){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
     <div class="appointment-stats">
         <h2>Today's Appointments</h2>
         <div class="stats-row">
@@ -458,6 +469,52 @@ setInterval(() => {
         })
         .catch(error => console.log('Polling failed:', error));
 }, 3000); // 3 second polling for fast updates
+
+// Mobile view: Show barber selector and filter columns
+function filterByBarber(barberId) {
+    const headers = document.querySelectorAll('.barber-header');
+    const cells = document.querySelectorAll('.appointment-cell');
+    
+    if (barberId === 'all') {
+        // Show all barbers
+        headers.forEach(h => h.style.display = 'block');
+        cells.forEach(c => c.style.display = 'block');
+    } else {
+        // Show only selected barber
+        const barberIndex = Array.from(headers).findIndex(h => {
+            const cell = document.querySelectorAll('.appointment-cell')[Array.from(headers).indexOf(h)];
+            return cell && cell.querySelector('.empty-slot[data-barber-id="' + barberId + '"]');
+        });
+        
+        headers.forEach((h, i) => {
+            const cells = document.querySelectorAll(`.grid-row .appointment-cell:nth-child(${i + 2})`);
+            if (h.textContent.includes(document.querySelector(`option[value="${barberId}"]`).textContent.split(' (')[0])) {
+                h.style.display = 'block';
+                cells.forEach(c => c.style.display = 'block');
+            } else {
+                h.style.display = 'none';
+                cells.forEach(c => c.style.display = 'none');
+            }
+        });
+    }
+}
+
+// Show mobile selector on small screens
+if (window.innerWidth <= 768) {
+    document.querySelector('.mobile-barber-selector').style.display = 'block';
+    document.querySelector('.scroll-indicator').style.display = 'none';
+}
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth <= 768) {
+        document.querySelector('.mobile-barber-selector').style.display = 'block';
+        document.querySelector('.scroll-indicator').style.display = 'none';
+    } else {
+        document.querySelector('.mobile-barber-selector').style.display = 'none';
+        document.querySelector('.scroll-indicator').style.display = 'block';
+        filterByBarber('all'); // Reset to show all
+    }
+});
 </script>
 {% endblock %}
 
