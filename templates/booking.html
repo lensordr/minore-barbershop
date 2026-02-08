@@ -51,6 +51,7 @@
         <div class="form-group">
             <label>Choose Your Barber</label>
             <div class="barber-list">
+                {% if not vip_barber %}
                 <div class="barber-item" data-barber-id="random">
                     <div class="barber-avatar random-avatar">
                         <span>🎲</span>
@@ -61,6 +62,7 @@
                     </div>
                     <div class="barber-check"></div>
                 </div>
+                {% endif %}
                 {% for barber in barbers %}
                 <div class="barber-item" data-barber-id="{{ barber.id }}">
                     <div class="barber-avatar">
