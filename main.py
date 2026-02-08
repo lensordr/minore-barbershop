@@ -526,6 +526,19 @@ async def staff_management(request: Request, location: int = None, db: Session =
         "location_id": location
     })
 
+@app.post("/admin/update-early-access/{barber_id}")
+async def update_early_access(barber_id: int, enabled: str = Form(None), price_add: float = Form(0), location: int = Form(None), db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get('DEFAULT_LOCATION', 1))
+    
+    barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+    if barber:
+        barber.early_access_enabled = 1 if enabled else 0
+        barber.early_access_price_add = price_add
+        db.commit()
+    
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
 @app.post("/admin/add-barber")
 async def add_barber(request: Request, name: str = Form(...), location: int = Form(None), db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
     if location is None:
@@ -986,22 +999,4 @@ async def debug_luca_1300(db: Session = Depends(get_db)):
             "status": apt.status,
             "is_online": apt.is_online,
             "service": apt.service.name,
-            "created_at": str(apt.id)  # ID shows creation order
-        })
-    
-    return {"luca_appointments_1300": result, "count": len(result)}
-
-@app.get("/export-data")
-async def export_data(db: Session = Depends(get_db)):
-    barbers = db.query(models.Barber).all()
-    services = db.query(models.Service).all()
-    
-    return {
-        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
-        "services": [{"name": s.name, "description": s.description, "duration": s.duration, "price": s.price} for s in services]
-    }
-
-if __name__ == "__main__":
-    import os
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+            "created_at": str(apt.id)  # ID shows creation 

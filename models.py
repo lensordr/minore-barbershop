@@ -23,6 +23,8 @@ class Barber(Base):
     name = Column(String, index=True)
     active = Column(Integer, default=1)  # 1=active, 0=closed
     location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
+    early_access_enabled = Column(Integer, default=0)  # 1=enabled, 0=disabled
+    early_access_price_add = Column(Float, default=0.0)  # Extra price for early access
     
     appointments = relationship("Appointment", back_populates="barber")
 
@@ -97,8 +99,4 @@ class DailyRevenue(Base):
     id = Column(Integer, primary_key=True, index=True)
     barber_id = Column(Integer, ForeignKey("barbers.id"))
     date = Column(String)  # YYYY-MM-DD format
-    revenue = Column(Float, default=0.0)
-    appointments_count = Column(Integer, default=0)
-    location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
-    
-    barber = relationship("Barber")
+    revenue = Column(Float, default=

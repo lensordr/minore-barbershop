@@ -29,6 +29,11 @@
             {% if client.email %}<p>Email: {{ client.email }}</p>{% endif %}
         </div>
         
+        <div class="form-group">
+            <label for="vip_code">VIP Code (Optional - For Early Access):</label>
+            <input type="text" id="vip_code" name="vip_code" placeholder="Enter VIP code" style="text-transform: uppercase;">
+            <small style="color: #666; display: block; margin-top: 0.25rem;">Have a VIP code? Book before 11 AM with special pricing!</small>
+        </div>
 
         
         <div class="form-group">
@@ -215,17 +220,4 @@ document.querySelectorAll('.barber-item').forEach(item => {
         document.querySelectorAll('.barber-item').forEach(i => i.classList.remove('selected'));
         
         // Add selected class to clicked item
-        this.classList.add('selected');
-        
-        // Set hidden input value
-        const barberId = this.getAttribute('data-barber-id');
-        document.getElementById('barber_id').value = barberId;
-        
-        // Update available times
-        updateAvailableTimes();
-    });
-});
-
-document.getElementById('service_id').addEventListener('change', updateAvailableTimes);
-</script>
-{% endblock %}
+        th
