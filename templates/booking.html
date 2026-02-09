@@ -136,21 +136,25 @@ function applyVipCode() {
 }
 
 function updateAvailableTimes() {
-    // Check if current time is before 11 AM
-    const now = new Date();
-    const currentHour = now.getHours();
+    const vipCode = document.getElementById('vip_code')?.value || '';
+    const hasVipCode = vipCode.trim().length > 0;
     
-    if (currentHour < 11) {
-        alert('Appointments are available starting 11 AM');
-        document.getElementById('appointment_time').innerHTML = '<option value="">Appointments available from 11 AM</option>';
-        document.getElementById('appointment_time').disabled = true;
-        return;
+    // Check if current time is before 11 AM (only for non-VIP users)
+    if (!hasVipCode) {
+        const now = new Date();
+        const currentHour = now.getHours();
+        
+        if (currentHour < 11) {
+            alert('Appointments are available starting 11 AM');
+            document.getElementById('appointment_time').innerHTML = '<option value="">Appointments available from 11 AM</option>';
+            document.getElementById('appointment_time').disabled = true;
+            return;
+        }
     }
     
     const barberId = document.getElementById('barber_id').value;
     const serviceId = document.getElementById('service_id').value;
     const timeSelect = document.getElementById('appointment_time');
-    const vipCode = document.getElementById('vip_code')?.value || '';
     
     if (barberId && serviceId) {
         timeSelect.innerHTML = '<option value="">Loading times...</option>';
