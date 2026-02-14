@@ -1365,6 +1365,20 @@ main {
     color: rgba(255, 255, 255, 0.8) !important;
 }
 
+.appointment-vip {
+    background-color: #dc3545 !important;
+    border: 2px solid #c82333 !important;
+    color: white !important;
+}
+
+.appointment-vip .client-name {
+    color: white !important;
+}
+
+.appointment-vip .service-code {
+    color: white !important;
+}
+
 /* Status overrides - must come after online/random styles */
 .appointment-item.appointment-completed {
     background: #155724 !important;
