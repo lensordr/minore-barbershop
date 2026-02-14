@@ -393,13 +393,11 @@ async def create_appointment_helper(
                 vip_extra_price = barber.early_access_price_add
                 is_vip_appointment = True
         
-        appointment = crud.create_appointment(db, client_name, client_email, client_phone, service_id, actual_barber_id, appointment_time, vip_extra_price)
-        # Mark as random or VIP appointment
+        appointment = crud.create_appointment(db, client_name, client_email, client_phone, service_id, actual_barber_id, appointment_time, vip_extra_price, is_vip_appointment)
+        # Mark as random appointment if it was randomly assigned
         if barber_id == "random":
             appointment.is_random = 1
-        if is_vip_appointment:
-            appointment.is_online = 2  # Use is_online=2 to mark VIP appointments
-        db.commit()
+            db.commit()
         
         print(f"✅ Online appointment created: ID={appointment.id}, Name={client_name}, Barber={actual_barber_id}, Time={appointment_time}, VIP_extra=€{vip_extra_price}, is_online={appointment.is_online}")
         # Send email only if provided
