@@ -49,13 +49,14 @@ MINORE BARBER Team
         
         msg.attach(MIMEText(body, 'plain'))
         
-        server = smtplib.SMTP(os.getenv('EMAIL_HOST'), int(os.getenv('EMAIL_PORT')))
+        # Brevo SMTP configuration
+        server = smtplib.SMTP('smtp-relay.brevo.com', 587)
         server.starttls()
-        server.login(os.getenv('EMAIL_USER'), os.getenv('EMAIL_PASSWORD'))
+        server.login(os.getenv('BREVO_SMTP_USER'), os.getenv('BREVO_SMTP_PASSWORD'))
         server.send_message(msg)
         server.quit()
         
-        print(f"✅ Email sent via Gmail to {client_email}")
+        print(f"✅ Email sent via Brevo to {client_email}")
         return True
         
     except Exception as e:
@@ -86,9 +87,10 @@ MINORE BARBER Team
         
         msg.attach(MIMEText(body, 'plain'))
         
-        server = smtplib.SMTP(os.getenv('EMAIL_HOST'), int(os.getenv('EMAIL_PORT')))
+        # Brevo SMTP configuration
+        server = smtplib.SMTP('smtp-relay.brevo.com', 587)
         server.starttls()
-        server.login(os.getenv('EMAIL_USER'), os.getenv('EMAIL_PASSWORD'))
+        server.login(os.getenv('BREVO_SMTP_USER'), os.getenv('BREVO_SMTP_PASSWORD'))
         server.send_message(msg)
         server.quit()
         
