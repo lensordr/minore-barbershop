@@ -21,12 +21,17 @@
     <form method="POST" action="/client/book/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}" id="bookingForm">
         <!-- Hidden pre-filled client info -->
         <input type="hidden" name="client_name" value="{{ client.name or client.phone }}">
-        <input type="hidden" name="client_email" value="{{ client.email }}">
         <input type="hidden" name="client_phone" value="{{ client.phone }}">
         
         <div class="client-info-display">
             <h3>Booking for: {{ client.name or client.phone }}</h3>
             {% if client.email %}<p>Email: {{ client.email }}</p>{% endif %}
+        </div>
+        
+        <div class="form-group">
+            <label for="client_email">Email (Optional - for confirmation):</label>
+            <input type="email" id="client_email" name="client_email" placeholder="your@email.com" value="{{ client.email or '' }}">
+            <small style="color: #666; display: block; margin-top: 0.25rem;">We'll send you a confirmation email</small>
         </div>
         
         <div class="form-group">
