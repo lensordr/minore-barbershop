@@ -842,7 +842,7 @@ async def check_client(phone: str, db: Session = Depends(get_db)):
         return {"exists": False}
 
 @app.get("/api/available-times/{barber_id}/{service_id}")
-async def get_available_times(barber_id: int, service_id: int, vip_code: str = "", db: Session = Depends(get_db)):
+async def get_available_times(barber_id: int, service_id: int, vip_code: str = "", date_selection: str = "today", db: Session = Depends(get_db)):
     from fastapi.responses import JSONResponse
     
     # Check if VIP code is valid for this barber
@@ -856,8 +856,9 @@ async def get_available_times(barber_id: int, service_id: int, vip_code: str = "
                 if barber.name.upper() == barber_name:
                     is_vip = True
     
-    # Get available times with VIP flag
-    times = crud.get_available_times_for_service(db, barber_id, service_id, is_vip)
+    # Get available times with VIP flag and date selection
+    use_tomorrow = (date_selection == "tomorrow" and is_vip)
+    times = crud.get_available_times_for_service(db, barber_id, service_id, is_vip, use_tomorrow)
     return JSONResponse(
         content=times,
         headers={

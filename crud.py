@@ -222,12 +222,15 @@ def create_appointment_lightning_fast(db: Session, client_name: str, service_id:
     service_duration = duration
     appointment_end = appointment_dt + timedelta(minutes=service_duration)
     
-    # Get all appointments for this barber today
+    # Get all appointments for this barber on the same day
+    day_start = datetime.combine(appointment_dt.date(), datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    
     all_appointments = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
         models.Appointment.status != "cancelled",
-        models.Appointment.appointment_time >= appointment_dt.date(),
-        models.Appointment.appointment_time < appointment_dt.date() + timedelta(days=1)
+        models.Appointment.appointment_time >= day_start,
+        models.Appointment.appointment_time < day_end
     ).all()
     
     # Check each appointment for overlap
@@ -324,7 +327,7 @@ def get_today_appointment_counts_by_location(db: Session, location_id: int):
     
     return {"total": total, "completed": completed, "cancelled": cancelled}
 
-def get_available_times_for_service(db: Session, barber_id: int, service_id: int, is_vip: bool = False):
+def get_available_times_for_service(db: Session, barber_id: int, service_id: int, is_vip: bool = False, use_tomorrow: bool = False):
     now = datetime.now()
     today = now.date()
     
@@ -341,22 +344,22 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     
     service_duration = service.duration
     
-    # VIP users can book for tomorrow
-    if is_vip:
+    # VIP users booking for tomorrow
+    if is_vip and use_tomorrow:
         tomorrow = today + timedelta(days=1)
         if tomorrow.weekday() == 6:  # Skip Sunday
             return []
         start_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.start_hour))
         end_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.end_hour))
         earliest_time = start_time  # VIP can book from opening time tomorrow
-    # Regular users: same day only
+    # Regular users or VIP booking for today
     else:
         # Block Sunday bookings
         if today.weekday() == 6:
             return []
         
         if now.hour >= schedule.end_hour:
-            # After hours - no slots available for regular users
+            # After hours - no slots available
             return []
         
         start_time = datetime.combine(today, datetime.min.time().replace(hour=schedule.start_hour))
@@ -379,10 +382,11 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
         else:
             earliest_time = datetime.combine(today, datetime.min.time().replace(hour=next_hour, minute=next_minute))
         
-        # Client restriction: cannot book before 11 AM
-        min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=11, minute=0))
-        if earliest_time < min_booking_time:
-            earliest_time = min_booking_time
+        # Client restriction: cannot book before 11 AM (unless VIP)
+        if not is_vip:
+            min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=11, minute=0))
+            if earliest_time < min_booking_time:
+                earliest_time = min_booking_time
     
     # Get existing appointments for this barber on target day (exclude cancelled)
     existing_appointments = db.query(models.Appointment).filter(

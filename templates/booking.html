@@ -52,8 +52,8 @@
         <div class="form-group" id="vipDateSelector">
             <label for="appointment_date">Select Date</label>
             <select id="appointment_date" name="appointment_date" onchange="updateAvailableTimes()">
-                <option value="today">Today</option>
-                <option value="tomorrow" selected>Tomorrow (VIP Early Access)</option>
+                <option value="today" selected>Today</option>
+                <option value="tomorrow">Tomorrow (VIP Early Access)</option>
             </select>
         </div>
         {% endif %}
@@ -155,6 +155,8 @@ function updateAvailableTimes() {
     const barberId = document.getElementById('barber_id').value;
     const serviceId = document.getElementById('service_id').value;
     const timeSelect = document.getElementById('appointment_time');
+    const dateSelector = document.getElementById('appointment_date');
+    const dateSelection = dateSelector ? dateSelector.value : 'today';
     
     if (barberId && serviceId) {
         timeSelect.innerHTML = '<option value="">Loading times...</option>';
@@ -170,7 +172,7 @@ function updateAvailableTimes() {
             
             barberItems.forEach(item => {
                 const barberId = item.getAttribute('data-barber-id');
-                fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&t=${Date.now()}`)
+                fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSelection}&t=${Date.now()}`)
                     .then(response => response.json())
                     .then(times => {
                         times.forEach(time => allTimes.add(time));
@@ -195,17 +197,8 @@ function updateAvailableTimes() {
                                     targetDate.setDate(targetDate.getDate() + 1);
                                 }
                                 const dateStr = targetDate.toISOString().split('T')[0];
-                                
-                                // For today, only show future times; for tomorrow, show all
-                                if (!dateSelector || dateSelector.value === 'today') {
-                                    if (timeInMinutes > currentTimeInMinutes) {
-                                        const datetime = `${dateStr}T${time}:00`;
-                                        timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
-                                    }
-                                } else {
-                                    const datetime = `${dateStr}T${time}:00`;
-                                    timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
-                                }
+                                const datetime = `${dateStr}T${time}:00`;
+                                timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
                             });
                             timeSelect.disabled = false;
                         }
@@ -219,7 +212,7 @@ function updateAvailableTimes() {
                     });
             });
         } else {
-            fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&t=${Date.now()}`)
+            fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSelection}&t=${Date.now()}`)
                 .then(response => response.json())
                 .then(times => {
                     timeSelect.innerHTML = '<option value="">Select a time</option>';
@@ -239,17 +232,8 @@ function updateAvailableTimes() {
                             targetDate.setDate(targetDate.getDate() + 1);
                         }
                         const dateStr = targetDate.toISOString().split('T')[0];
-                        
-                        // For today, only show future times; for tomorrow, show all
-                        if (!dateSelector || dateSelector.value === 'today') {
-                            if (timeInMinutes > currentTimeInMinutes) {
-                                const datetime = `${dateStr}T${time}:00`;
-                                timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
-                            }
-                        } else {
-                            const datetime = `${dateStr}T${time}:00`;
-                            timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
-                        }
+                        const datetime = `${dateStr}T${time}:00`;
+                        timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
                     });
                     timeSelect.disabled = false;
                 })
