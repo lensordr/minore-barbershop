@@ -29,15 +29,7 @@
             {% endfor %}
         </select>
     </div>
-    
-    <!-- Date Selector for All Views -->
-    <div class="date-selector" style="margin-bottom: 1rem;">
-        <label for="dateSelect" style="color: #fbcc93; font-weight: bold; margin-bottom: 0.5rem; display: block;">Select Date:</label>
-        <select id="dateSelect" onchange="changeDate(this.value)" style="width: 100%; max-width: 300px; padding: 0.75rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fbcc93; font-size: 1rem;">
-            <option value="today" selected>Today</option>
-            <option value="tomorrow">Tomorrow</option>
-        </select>
-    </div>
+
     
     <div class="appointment-stats">
         <h2>Today's Appointments</h2>
@@ -47,6 +39,15 @@
             <span class="stat cancelled">Cancelled: {{ counts.cancelled }}</span>
 
         </div>
+    </div>
+    
+    <!-- Date Selector for All Views -->
+    <div class="date-selector" style="margin: 1.5rem 0; padding: 1rem; background: #2a2a2a; border-radius: 8px;">
+        <label for="dateSelect" style="color: #fbcc93; font-weight: bold; margin-bottom: 0.5rem; display: block; font-size: 1.1rem;">📅 Select Date:</label>
+        <select id="dateSelect" onchange="changeDate(this.value)" style="width: 100%; max-width: 300px; padding: 0.75rem; border-radius: 8px; border: 2px solid #fbcc93; background: #1d1a1c; color: #fbcc93; font-size: 1rem; cursor: pointer;">
+            <option value="today" selected>Today</option>
+            <option value="tomorrow">Tomorrow (VIP Bookings)</option>
+        </select>
     </div>
     
     <div class="scroll-indicator">👈 Swipe left/right to see all barbers 👉</div>
