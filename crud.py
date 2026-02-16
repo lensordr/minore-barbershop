@@ -270,15 +270,18 @@ def get_today_appointments_ordered(db: Session):
 
 def get_today_appointments_ordered_by_location(db: Session, location_id: int):
     today = datetime.now().date()
+    return get_appointments_by_date_and_location(db, today, location_id)
+
+def get_appointments_by_date_and_location(db: Session, target_date, location_id: int):
     appointments = db.query(models.Appointment).join(models.Barber).filter(
-        models.Appointment.appointment_time >= today,
-        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.appointment_time >= target_date,
+        models.Appointment.appointment_time < target_date + timedelta(days=1),
         models.Barber.location_id == location_id
         # Show ALL appointments including cancelled for admin visibility
     ).order_by(models.Appointment.appointment_time, models.Appointment.id).all()
     
     # Debug logging
-    print(f"📋 Loading {len(appointments)} appointments for location {location_id}:")
+    print(f"📋 Loading {len(appointments)} appointments for location {location_id} on {target_date}:")
     for apt in appointments:
         barber_status = "active" if apt.barber.active else "inactive"
         print(f"  - ID={apt.id}, Name={apt.client_name}, Barber={apt.barber_id}({barber_status}), Time={apt.appointment_time.strftime('%H:%M')}, Status={apt.status}")
@@ -308,22 +311,25 @@ def get_today_appointment_counts(db: Session):
 
 def get_today_appointment_counts_by_location(db: Session, location_id: int):
     today = datetime.now().date()
+    return get_appointment_counts_by_date_and_location(db, today, location_id)
+
+def get_appointment_counts_by_date_and_location(db: Session, target_date, location_id: int):
     total = db.query(models.Appointment).join(models.Barber).filter(
-        models.Appointment.appointment_time >= today,
-        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.appointment_time >= target_date,
+        models.Appointment.appointment_time < target_date + timedelta(days=1),
         models.Barber.location_id == location_id
     ).count()
     
     completed = db.query(models.Appointment).join(models.Barber).filter(
-        models.Appointment.appointment_time >= today,
-        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.appointment_time >= target_date,
+        models.Appointment.appointment_time < target_date + timedelta(days=1),
         models.Appointment.status == "completed",
         models.Barber.location_id == location_id
     ).count()
     
     cancelled = db.query(models.Appointment).join(models.Barber).filter(
-        models.Appointment.appointment_time >= today,
-        models.Appointment.appointment_time < today + timedelta(days=1),
+        models.Appointment.appointment_time >= target_date,
+        models.Appointment.appointment_time < target_date + timedelta(days=1),
         models.Appointment.status == "cancelled",
         models.Barber.location_id == location_id
     ).count()
@@ -347,14 +353,15 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
     
     service_duration = service.duration
     
-    # VIP users booking for tomorrow
+    # VIP users booking for tomorrow (24h advance)
     if is_vip and use_tomorrow:
         tomorrow = today + timedelta(days=1)
         if tomorrow.weekday() == 6:  # Skip Sunday
             return []
         start_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.start_hour))
         end_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=schedule.end_hour))
-        earliest_time = start_time  # VIP can book from opening time tomorrow
+        # VIP 24h advance: earliest slot is 1 PM (13:00)
+        earliest_time = datetime.combine(tomorrow, datetime.min.time().replace(hour=13, minute=0))
     # Regular users or VIP booking for today
     else:
         # Block Sunday bookings

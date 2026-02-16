@@ -476,15 +476,22 @@ async def admin_login_post(username: str = Form(...), password: str = Form(...))
 
 
 @app.get("/admin/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(request: Request, location: int = None, db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
+async def admin_dashboard(request: Request, location: int = None, date: str = None, db: Session = Depends(get_db), auth: bool = Depends(check_admin_auth)):
     if location is None:
         location = int(os.environ.get('DEFAULT_LOCATION', 1))
-    print(f"Dashboard accessed at {datetime.now()} for location {location}")
-    appointments = crud.get_today_appointments_ordered_by_location(db, location)
+    
+    # Determine which date to show
+    if date == 'tomorrow':
+        target_date = datetime.now().date() + timedelta(days=1)
+    else:
+        target_date = datetime.now().date()
+    
+    print(f"Dashboard accessed at {datetime.now()} for location {location}, date {target_date}")
+    appointments = crud.get_appointments_by_date_and_location(db, target_date, location)
     barbers = crud.get_barbers_with_revenue_by_location(db, location)
     services = crud.get_services_by_location(db, location)
     schedule = crud.get_schedule(db)
-    counts = crud.get_today_appointment_counts_by_location(db, location)
+    counts = crud.get_appointment_counts_by_date_and_location(db, target_date, location)
     
     # Create grid data with appointment spans
     from grid_helper import create_appointment_grid
