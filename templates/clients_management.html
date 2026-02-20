@@ -170,5 +170,43 @@
     text-align: center;
     color: #666;
 }
+
+@media (max-width: 768px) {
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .filter-input {
+        width: 100%;
+    }
+    
+    .clients-header {
+        display: none;
+    }
+    
+    .client-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+        padding: 1rem;
+    }
+    
+    .client-row > span {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .client-row > span::before {
+        content: attr(data-label);
+        font-weight: bold;
+        color: #666;
+    }
+    
+    .client-name::before { content: 'Name: '; }
+    .client-phone::before { content: 'Phone: '; }
+    .client-status::before { content: 'Status: '; }
+    .client-actions::before { content: 'Actions: '; }
+}
 </style>
 {% endblock %}
