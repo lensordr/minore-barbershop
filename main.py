@@ -89,6 +89,7 @@ def check_business_hours():
     # return 10 <= current_time.hour < 22
 
 @app.get("/", response_class=HTMLResponse)
+@app.head("/")
 async def home(request: Request):
     if not check_business_hours():
         return HTMLResponse("<h1>MINORE BARBERSHOP</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>")
@@ -667,15 +668,40 @@ async def edit_appointment(
     db: Session = Depends(get_db)
 ):
     try:
-        # Always update all fields when provided
         appointment = db.query(models.Appointment).filter(models.Appointment.id == appointment_id).first()
         if not appointment:
             return {"success": False, "message": "Appointment not found"}
         
-        # Update basic info
-        appointment.client_name = client_name
+        # Check for conflicts if barber, time, or duration changed
+        if (barber_id and barber_id != appointment.barber_id) or time or duration:
+            check_barber_id = barber_id if barber_id else appointment.barber_id
+            check_duration = duration if duration else (appointment.custom_duration or appointment.service.duration)
+            
+            if time:
+                current_date = appointment.appointment_time.date()
+                new_time = datetime.strptime(time, "%H:%M").time()
+                check_appointment_time = datetime.combine(current_date, new_time)
+            else:
+                check_appointment_time = appointment.appointment_time
+            
+            appointment_end = check_appointment_time + timedelta(minutes=check_duration)
+            
+            # Check for conflicts with other appointments (excluding current one)
+            conflicts = db.query(models.Appointment).filter(
+                models.Appointment.barber_id == check_barber_id,
+                models.Appointment.status != "cancelled",
+                models.Appointment.id != appointment_id
+            ).all()
+            
+            for existing in conflicts:
+                existing_duration = existing.custom_duration or existing.service.duration
+                existing_end = existing.appointment_time + timedelta(minutes=existing_duration)
+                
+                if (check_appointment_time < existing_end and appointment_end > existing.appointment_time):
+                    return {"success": False, "message": f"Time conflicts with {existing.client_name} at {existing.appointment_time.strftime('%H:%M')}"}
         
-        # Update optional fields
+        # Update fields
+        appointment.client_name = client_name
         if barber_id:
             appointment.barber_id = barber_id
         if time:
@@ -837,9 +863,10 @@ async def get_appointment_details(appointment_id: int, db: Session = Depends(get
     if appointment:
         return {
             "phone": appointment.phone or "",
-            "email": appointment.email or ""
+            "email": appointment.email or "",
+            "service_id": appointment.service_id
         }
-    return {"phone": "", "email": ""}
+    return {"phone": "", "email": "", "service_id": None}
 
 @app.get("/api/check-client")
 async def check_client(phone: str, db: Session = Depends(get_db)):

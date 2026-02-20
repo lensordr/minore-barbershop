@@ -202,7 +202,7 @@
             </div>
             <div class="form-group">
                 <label for="editBarber">Barber:</label>
-                <select id="editBarber" name="barber_id" required>
+                <select id="editBarber" name="barber_id" required onchange="loadAvailableTimesForEdit()">
                     {% for barber in barbers %}
                     <option value="{{ barber.id }}">{{ barber.name }}</option>
                     {% endfor %}
@@ -210,8 +210,11 @@
             </div>
             <div class="form-group">
                 <label for="editTime">Time:</label>
-                <input type="time" id="editTime" name="time" required>
+                <select id="editTime" name="time" required>
+                    <option value="">Loading...</option>
+                </select>
             </div>
+            <input type="hidden" id="editServiceId" name="service_id">
             <div class="form-group">
                 <label for="editPrice">Price (€):</label>
                 <input type="number" id="editPrice" name="price" step="0.01" min="0" required>
@@ -356,29 +359,32 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
     document.getElementById('editAppointmentId').value = id;
     document.getElementById('editClientName').value = clientName;
     document.getElementById('editServiceName').textContent = serviceName;
-    document.getElementById('editTime').value = time;
     document.getElementById('editPrice').value = price;
     document.getElementById('editDuration').value = duration;
     document.getElementById('editBarber').value = barberId;
     
-    // Get appointment details including phone
+    // Store current time and fetch service_id
+    window.currentEditTime = time;
     fetch(`/api/appointment-details/${id}`)
         .then(response => response.json())
         .then(data => {
-            const phoneGroup = document.getElementById('editPhoneGroup');
-            const phoneSpan = document.getElementById('editClientPhone');
-            
-            if (data.phone && data.phone.trim()) {
-                phoneSpan.textContent = data.phone;
-                phoneGroup.style.display = 'block';
-            } else {
-                phoneGroup.style.display = 'none';
-            }
-        })
-        .catch(error => {
-            console.error('Error loading appointment details:', error);
-            document.getElementById('editPhoneGroup').style.display = 'none';
+            document.getElementById('editServiceId').value = data.service_id;
+            loadAvailableTimesForEdit();
         });
+    
+    // Get phone info
+    const phoneGroup = document.getElementById('editPhoneGroup');
+    const phoneSpan = document.getElementById('editClientPhone');
+    if (data.phone && data.phone.trim()) {
+        phoneSpan.textContent = data.phone;
+        phoneGroup.style.display = 'block';
+    } else {
+        phoneGroup.style.display = 'none';
+    }
+}).catch(error => {
+    console.error('Error loading appointment details:', error);
+    document.getElementById('editPhoneGroup').style.display = 'none';
+});
     
     // Show/hide action buttons based on status
     const actionButtons = document.getElementById('appointmentActions');
@@ -420,6 +426,37 @@ function submitEditAppointment(event) {
             alert(data.message);
         }
     });
+}
+
+function loadAvailableTimesForEdit() {
+    const barberId = document.getElementById('editBarber').value;
+    const serviceId = document.getElementById('editServiceId').value;
+    const timeSelect = document.getElementById('editTime');
+    
+    if (!barberId || !serviceId) return;
+    
+    timeSelect.innerHTML = '<option value="">Loading...</option>';
+    
+    fetch(`/api/available-times/${barberId}/${serviceId}?date_selection=today&t=${Date.now()}`)
+        .then(response => response.json())
+        .then(times => {
+            timeSelect.innerHTML = '';
+            times.forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            });
+            
+            // Set current time if available
+            if (window.currentEditTime) {
+                timeSelect.value = window.currentEditTime;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading times:', error);
+            timeSelect.innerHTML = '<option value="">Error loading times</option>';
+        });
 }
 
 function completeAppointment() {
