@@ -102,18 +102,29 @@
                         </form>
                     </div>
                 </div>
-                <div class="staff-actions">
-                    <button onclick="editBarber({{ barber.id }}, '{{ barber.name|replace("'", "\\'")|safe }}')" class="btn-edit">Edit</button>
-                    <form method="POST" action="/admin/toggle-barber/{{ barber.id }}" style="display: inline;">
-                        <input type="hidden" name="location" value="{{ location_id }}">
-                        <button type="submit" class="btn-toggle">{% if barber.active %}Close{% else %}Open{% endif %}</button>
-                    </form>
-                    {% if barber.name != 'Luca' %}
-                    <form method="POST" action="/admin/delete-barber/{{ barber.id }}" style="display: inline;">
-                        <input type="hidden" name="location" value="{{ location_id }}">
-                        <button type="submit" class="btn-delete" onclick="return confirm('Delete barber?')">Delete</button>
-                    </form>
-                    {% endif %}
+                <div class="staff-actions" style="position: relative;">
+                    <button onclick="toggleDropdown({{ barber.id }})" class="btn" style="background: #2a2a2a; color: #fbcc93; padding: 0.5rem 1rem; border: 1px solid #444; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;">
+                        ⚙️ Actions <span style="font-size: 0.7rem;">▼</span>
+                    </button>
+                    <div id="dropdown-{{ barber.id }}" class="action-dropdown" style="display: none; position: absolute; right: 0; top: 100%; margin-top: 0.5rem; background: #2a2a2a; border: 1px solid #444; border-radius: 6px; min-width: 150px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 100;">
+                        <button onclick="editBarber({{ barber.id }}, '{{ barber.name|replace("'", "\\'")|safe }}'); toggleDropdown({{ barber.id }})" style="width: 100%; text-align: left; padding: 0.75rem 1rem; background: none; border: none; color: #fbcc93; cursor: pointer; border-bottom: 1px solid #444; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#1d1a1c'" onmouseout="this.style.background='none'">
+                            ✏️ Edit Name
+                        </button>
+                        <form method="POST" action="/admin/toggle-barber/{{ barber.id }}" style="margin: 0;">
+                            <input type="hidden" name="location" value="{{ location_id }}">
+                            <button type="submit" style="width: 100%; text-align: left; padding: 0.75rem 1rem; background: none; border: none; color: #fbcc93; cursor: pointer; border-bottom: 1px solid #444; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#1d1a1c'" onmouseout="this.style.background='none'">
+                                {% if barber.active %}🔒 Close{% else %}🔓 Open{% endif %}
+                            </button>
+                        </form>
+                        {% if barber.name != 'Luca' %}
+                        <form method="POST" action="/admin/delete-barber/{{ barber.id }}" style="margin: 0;" onsubmit="return confirm('Delete barber?')">
+                            <input type="hidden" name="location" value="{{ location_id }}">
+                            <button type="submit" style="width: 100%; text-align: left; padding: 0.75rem 1rem; background: none; border: none; color: #ff4444; cursor: pointer; display: flex; align-items: center; gap: 0.5rem;" onmouseover="this.style.background='#1d1a1c'" onmouseout="this.style.background='none'">
+                                🗑️ Delete
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
             {% endfor %}
@@ -147,100 +158,4 @@
                 <div class="service-actions">
                     <button onclick="editService({{ service.id }}, '{{ service.name|replace("'", "\\'")|safe }}', '{{ (service.description or "")|replace("'", "\\'")|safe }}', {{ service.duration }}, {{ service.price }})" class="btn-edit">Edit</button>
                     <form method="POST" action="/admin/delete-service/{{ service.id }}" style="display: inline;">
-                        <input type="hidden" name="location" value="{{ location_id }}">
-                        <button type="submit" class="btn-delete" onclick="return confirm('Delete service?')">Delete</button>
-                    </form>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-    
-    <!-- Edit Service Modal -->
-    <div id="editModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3>Edit Service</h3>
-            <form id="editForm" method="POST">
-                <input type="text" id="editName" name="name" placeholder="Service name" required>
-                <input type="text" id="editDescription" name="description" placeholder="Description" required>
-                <input type="number" id="editDuration" name="duration" placeholder="Duration (min)" required>
-                <input type="number" id="editPrice" name="price" step="0.01" placeholder="Price" required>
-                <div class="modal-actions">
-                    <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" onclick="closeModal()" class="btn btn-secondary">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-    
-    <!-- Edit Barber Modal -->
-    <div id="editBarberModal" class="modal" style="display: none;">
-        <div class="modal-content">
-            <h3>Edit Barber</h3>
-            <form id="editBarberForm" method="POST">
-                <input type="text" id="editBarberName" name="name" placeholder="Barber name" required>
-                <div class="modal-actions">
-                    <button type="submit" class="btn btn-primary">Save</button>
-                    <button type="button" onclick="closeBarberModal()" class="btn btn-secondary">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<style>
-/* Toggle Switch */
-input[type="checkbox"]:checked + span {
-    background-color: rgba(255,255,255,0.5) !important;
-}
-input[type="checkbox"]:checked + span + span {
-    transform: translateX(26px);
-}
-.btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-</style>
-<script>
-function editService(id, name, description, duration, price) {
-    document.getElementById('editName').value = name || '';
-    document.getElementById('editDescription').value = description || '';
-    document.getElementById('editDuration').value = duration;
-    document.getElementById('editPrice').value = price;
-    document.getElementById('editForm').action = '/admin/edit-service/' + id;
-    
-    // Add location hidden field
-    const locationInput = document.createElement('input');
-    locationInput.type = 'hidden';
-    locationInput.name = 'location';
-    locationInput.value = '{{ location_id }}';
-    document.getElementById('editForm').appendChild(locationInput);
-    
-    document.getElementById('editModal').style.display = 'block';
-}
-
-function closeModal() {
-    document.getElementById('editModal').style.display = 'none';
-}
-
-function editBarber(id, name) {
-    document.getElementById('editBarberName').value = name || '';
-    document.getElementById('editBarberForm').action = '/admin/edit-barber/' + id;
-    
-    // Add location hidden field
-    const locationInput = document.createElement('input');
-    locationInput.type = 'hidden';
-    locationInput.name = 'location';
-    locationInput.value = '{{ location_id }}';
-    document.getElementById('editBarberForm').appendChild(locationInput);
-    
-    document.getElementById('editBarberModal').style.display = 'block';
-}
-
-function closeBarberModal() {
-    document.getElementById('editBarberModal').style.display = 'none';
-}
-</script>
-{% endblock %}
+                        <input type="hidden" name=
