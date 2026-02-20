@@ -200,6 +200,84 @@ input[type="checkbox"]:checked + span + span {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
+
+/* Mobile Optimization */
+@media (max-width: 768px) {
+    .schedule-row {
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .schedule-row label,
+    .schedule-row select,
+    .schedule-row button {
+        width: 100%;
+    }
+    
+    .inline-form {
+        flex-direction: column;
+    }
+    
+    .inline-form input,
+    .inline-form button {
+        width: 100%;
+    }
+    
+    .staff-item {
+        flex-direction: column;
+    }
+    
+    .staff-actions {
+        width: 100%;
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .staff-actions button,
+    .staff-actions form {
+        flex: 1;
+    }
+    
+    .staff-actions button {
+        width: 100%;
+        padding: 0.5rem;
+        font-size: 0.85rem;
+    }
+    
+    .service-form .form-row {
+        flex-direction: column;
+    }
+    
+    .service-form input,
+    .service-form button {
+        width: 100%;
+    }
+    
+    .service-item {
+        flex-direction: column;
+    }
+    
+    .service-actions {
+        width: 100%;
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+    
+    .service-actions button,
+    .service-actions form {
+        flex: 1;
+    }
+    
+    .early-access-section h4 {
+        font-size: 0.9rem !important;
+    }
+    
+    .early-access-section span {
+        font-size: 0.8rem !important;
+    }
+}
 </style>
 <script>
 function editService(id, name, description, duration, price) {
