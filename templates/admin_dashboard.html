@@ -370,21 +370,21 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
         .then(data => {
             document.getElementById('editServiceId').value = data.service_id;
             loadAvailableTimesForEdit();
+            
+            // Get phone info
+            const phoneGroup = document.getElementById('editPhoneGroup');
+            const phoneSpan = document.getElementById('editClientPhone');
+            if (data.phone && data.phone.trim()) {
+                phoneSpan.textContent = data.phone;
+                phoneGroup.style.display = 'block';
+            } else {
+                phoneGroup.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading appointment details:', error);
+            document.getElementById('editPhoneGroup').style.display = 'none';
         });
-    
-    // Get phone info
-    const phoneGroup = document.getElementById('editPhoneGroup');
-    const phoneSpan = document.getElementById('editClientPhone');
-    if (data.phone && data.phone.trim()) {
-        phoneSpan.textContent = data.phone;
-        phoneGroup.style.display = 'block';
-    } else {
-        phoneGroup.style.display = 'none';
-    }
-}).catch(error => {
-    console.error('Error loading appointment details:', error);
-    document.getElementById('editPhoneGroup').style.display = 'none';
-});
     
     // Show/hide action buttons based on status
     const actionButtons = document.getElementById('appointmentActions');
