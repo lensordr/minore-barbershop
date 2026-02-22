@@ -111,7 +111,7 @@ def delete_service(db: Session, service_id: int):
         db.commit()
     return service
 
-def create_appointment(db: Session, client_name: str, email: str, phone: str, service_id: int, barber_id: int, appointment_time: str, vip_extra_price: float = 0, is_vip: bool = False):
+def create_appointment(db: Session, client_name: str, email: str, phone: str, service_id: int, barber_id: int, appointment_time: str, vip_extra_price: float = 0, is_vip: bool = False, location_id: int = 1):
     if not phone or phone.strip() == "":
         raise ValueError("Phone number is required")
     
@@ -148,9 +148,10 @@ def create_appointment(db: Session, client_name: str, email: str, phone: str, se
     service_duration = service.duration
     appointment_end = appointment_dt + timedelta(minutes=service_duration)
     
-    # Check for time conflicts with existing appointments
+    # Check for time conflicts with existing appointments FOR THIS LOCATION
     existing_appointments = db.query(models.Appointment).filter(
         models.Appointment.barber_id == barber_id,
+        models.Appointment.location_id == location_id,
         models.Appointment.status != "cancelled"
     ).all()
     
@@ -182,6 +183,7 @@ def create_appointment(db: Session, client_name: str, email: str, phone: str, se
         cancel_token=cancel_token,
         is_online=online_status,
         custom_price=final_price,
+        location_id=location_id,
         # Legacy fields for compatibility
         client_name=client_name,
         phone=phone,

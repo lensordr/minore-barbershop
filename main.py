@@ -394,7 +394,7 @@ async def create_appointment_helper(
                 vip_extra_price = barber.early_access_price_add
                 is_vip_appointment = True
         
-        appointment = crud.create_appointment(db, client_name, client_email, client_phone, service_id, actual_barber_id, appointment_time, vip_extra_price, is_vip_appointment)
+        appointment = crud.create_appointment(db, client_name, client_email, client_phone, service_id, actual_barber_id, appointment_time, vip_extra_price, is_vip_appointment, location_id)
         # Mark as random appointment if it was randomly assigned
         if barber_id == "random":
             appointment.is_random = 1
@@ -686,9 +686,10 @@ async def edit_appointment(
             
             appointment_end = check_appointment_time + timedelta(minutes=check_duration)
             
-            # Check for conflicts with other appointments (excluding current one)
+            # Check for conflicts with other appointments (excluding current one) IN SAME LOCATION
             conflicts = db.query(models.Appointment).filter(
                 models.Appointment.barber_id == check_barber_id,
+                models.Appointment.location_id == appointment.location_id,
                 models.Appointment.status != "cancelled",
                 models.Appointment.id != appointment_id
             ).all()
@@ -699,6 +700,19 @@ async def edit_appointment(
                 
                 if (check_appointment_time < existing_end and appointment_end > existing.appointment_time):
                     return {"success": False, "message": f"Time conflicts with {existing.client_name} at {existing.appointment_time.strftime('%H:%M')}"}
+        
+        # Log changes before updating
+        changes = []
+        old_barber = appointment.barber.name if appointment.barber else "None"
+        if barber_id and barber_id != appointment.barber_id:
+            new_barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+            changes.append(f"Barber: {old_barber} → {new_barber.name if new_barber else 'Unknown'}")
+        if time:
+            old_time = appointment.appointment_time.strftime('%H:%M')
+            changes.append(f"Time: {old_time} → {time}")
+        if price is not None and price != (appointment.custom_price or appointment.service.price):
+            old_price = appointment.custom_price or appointment.service.price
+            changes.append(f"Price: €{old_price} → €{price}")
         
         # Update fields
         appointment.client_name = client_name
@@ -712,6 +726,17 @@ async def edit_appointment(
             appointment.custom_price = price
         if duration is not None:
             appointment.custom_duration = duration
+        
+        # Save audit log if there were changes
+        if changes:
+            audit_log = models.AppointmentAuditLog(
+                appointment_id=appointment_id,
+                action="updated",
+                changed_by="admin",
+                changes="; ".join(changes),
+                timestamp=datetime.utcnow()
+            )
+            db.add(audit_log)
             
         db.commit()
         return {"success": True, "message": "Appointment updated successfully"}

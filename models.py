@@ -104,3 +104,14 @@ class DailyRevenue(Base):
     location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     
     barber = relationship("Barber")
+
+
+class AppointmentAuditLog(Base):
+    __tablename__ = "appointment_audit_log"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    appointment_id = Column(Integer, index=True)
+    action = Column(String(50))  # created, updated, cancelled, completed
+    changed_by = Column(String(100))  # admin, client, system
+    changes = Column(Text)  # JSON string of what changed
+    timestamp = Column(DateTime, default=datetime.utcnow)
