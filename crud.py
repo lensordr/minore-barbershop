@@ -275,12 +275,20 @@ def get_today_appointments_ordered_by_location(db: Session, location_id: int):
     return get_appointments_by_date_and_location(db, today, location_id)
 
 def get_appointments_by_date_and_location(db: Session, target_date, location_id: int):
-    appointments = db.query(models.Appointment).join(models.Barber).filter(
-        models.Appointment.appointment_time >= target_date,
-        models.Appointment.appointment_time < target_date + timedelta(days=1),
-        models.Barber.location_id == location_id
-        # Show ALL appointments including cancelled for admin visibility
-    ).order_by(models.Appointment.appointment_time, models.Appointment.id).all()
+    from sqlalchemy.orm import joinedload
+    
+    # CRITICAL FIX #2: Use joinedload to prevent N+1 queries
+    # This loads all related data in ONE query instead of 100+ queries
+    appointments = db.query(models.Appointment)\
+        .join(models.Barber)\
+        .options(joinedload(models.Appointment.service))\
+        .options(joinedload(models.Appointment.barber))\
+        .options(joinedload(models.Appointment.client))\
+        .filter(
+            models.Appointment.appointment_time >= target_date,
+            models.Appointment.appointment_time < target_date + timedelta(days=1),
+            models.Barber.location_id == location_id
+        ).order_by(models.Appointment.appointment_time, models.Appointment.id).all()
     
     # Debug logging
     print(f"📋 Loading {len(appointments)} appointments for location {location_id} on {target_date}:")
@@ -478,7 +486,13 @@ def get_barbers_with_revenue(db: Session):
 
 def get_barbers_with_revenue_by_location(db: Session, location_id: int):
     from sqlalchemy import func
-    barbers = db.query(models.Barber).filter(models.Barber.location_id == location_id).order_by(models.Barber.id).all()
+    from sqlalchemy.orm import joinedload
+    
+    # CRITICAL FIX #2: Eager load to prevent N+1
+    barbers = db.query(models.Barber)\
+        .options(joinedload(models.Barber.appointments))\
+        .filter(models.Barber.location_id == location_id)\
+        .order_by(models.Barber.id).all()
     today = datetime.now().date()
     
     # Single query for all barber stats
