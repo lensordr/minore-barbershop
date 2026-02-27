@@ -347,6 +347,14 @@ def get_appointment_counts_by_date_and_location(db: Session, target_date, locati
     return {"total": total, "completed": completed, "cancelled": cancelled}
 
 def get_available_times_for_service(db: Session, barber_id: int, service_id: int, is_vip: bool = False, use_tomorrow: bool = False):
+    """
+    Get available time slots for a service
+    
+    VIP CODE RULES:
+    - VIP code allows booking 24 hours in advance (tomorrow from 1 PM)
+    - VIP code also allows booking TODAY but only slots AFTER 12 PM (noon)
+    - Regular users: can only book today from 11 AM onwards
+    """
     now = datetime.now()
     today = now.date()
     
@@ -402,11 +410,18 @@ def get_available_times_for_service(db: Session, barber_id: int, service_id: int
         else:
             earliest_time = datetime.combine(today, datetime.min.time().replace(hour=next_hour, minute=next_minute))
         
-        # Client restriction: cannot book before 11 AM (unless VIP)
-        if not is_vip:
+        # Time restrictions based on user type:
+        # - Regular users: cannot book before 11 AM
+        # - VIP users: cannot book before 12 PM (noon)
+        if is_vip:
+            # VIP restriction: can only book slots AFTER 12 PM (noon) for today
+            min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=12, minute=0))
+        else:
+            # Regular user restriction: can only book from 11 AM onwards
             min_booking_time = datetime.combine(today, datetime.min.time().replace(hour=11, minute=0))
-            if earliest_time < min_booking_time:
-                earliest_time = min_booking_time
+        
+        if earliest_time < min_booking_time:
+            earliest_time = min_booking_time
     
     # Get existing appointments for this barber on target day (exclude cancelled)
     existing_appointments = db.query(models.Appointment).filter(
