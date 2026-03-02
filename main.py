@@ -16,6 +16,13 @@ from sse_starlette.sse import EventSourceResponse
 from contextlib import asynccontextmanager
 import time
 
+# Initialize Sentry error monitoring
+try:
+    from sentry_config import init_sentry
+    init_sentry()
+except Exception as e:
+    print(f"⚠️  Sentry initialization failed: {e}")
+
 def check_admin_auth(request: Request, admin_logged_in: str = Cookie(None)):
     if admin_logged_in != "true":
         return RedirectResponse(url="/admin/login", status_code=303)
@@ -35,6 +42,13 @@ async def lifespan(app: FastAPI):
         print(f"Scheduler shutdown error (ignored): {e}")
 
 app = FastAPI(title="MINORE BARBER", lifespan=lifespan)
+
+# Register global error handlers
+try:
+    from error_handlers import register_error_handlers
+    register_error_handlers(app)
+except Exception as e:
+    print(f"⚠️  Error handler registration failed: {e}")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")

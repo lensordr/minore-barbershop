@@ -10,3 +10,6 @@ sse-starlette==1.6.5
 python-dotenv==1.0.0
 requests==2.31.0
 psycopg[binary]==3.2.3
+
+# Error Monitoring
+sentry-sdk[fastapi]==1.39.2
