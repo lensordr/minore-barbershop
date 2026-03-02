@@ -674,7 +674,7 @@ async def reopen_appointment(appointment_id: int, db: Session = Depends(get_db))
 @app.post("/admin/edit-appointment")
 async def edit_appointment(
     appointment_id: int = Form(...),
-    client_name: str = Form(...),
+    client_name: str = Form(None),
     barber_id: int = Form(None),
     time: str = Form(None),
     price: float = Form(None),
@@ -729,7 +729,8 @@ async def edit_appointment(
             changes.append(f"Price: €{old_price} → €{price}")
         
         # Update fields
-        appointment.client_name = client_name
+        if client_name:
+            appointment.client_name = client_name
         if barber_id:
             appointment.barber_id = barber_id
         if time:
