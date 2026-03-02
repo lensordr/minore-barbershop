@@ -1099,3 +1099,10 @@ if __name__ == "__main__":
     import os
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+@app.get("/sentry-debug")
+async def trigger_error():
+    """Sentry verification endpoint - triggers test error"""
+    division_by_zero = 1 / 0
+    return {"status": "never reached"}
