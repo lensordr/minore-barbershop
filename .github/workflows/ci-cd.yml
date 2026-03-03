@@ -33,24 +33,24 @@ jobs:
     
     - name: Code Quality - Black (formatting)
       run: |
-        black --check main.py crud.py models.py || echo "⚠️ Code formatting issues found"
-      continue-on-error: true
+        black --check main.py crud.py models.py
+      continue-on-error: false
     
     - name: Code Quality - Flake8 (linting)
       run: |
-        flake8 main.py crud.py models.py --max-line-length=120 --ignore=E501,W503 || echo "⚠️ Linting issues found"
-      continue-on-error: true
+        flake8 main.py crud.py models.py --max-line-length=120 --ignore=E501,W503
+      continue-on-error: false
     
     - name: Run Unit Tests
       run: |
-        pytest tests/ -v --cov=. --cov-report=term-missing || echo "⚠️ Some tests failed"
-      continue-on-error: true
+        pytest tests/ -v --cov=. --cov-report=term-missing
+      continue-on-error: false
     
     - name: Security Check - Bandit
       run: |
         pip install bandit
-        bandit -r . -ll || echo "⚠️ Security issues found"
-      continue-on-error: true
+        bandit -r . -ll
+      continue-on-error: false
 
   deploy:
     name: Deploy to Production
@@ -63,3 +63,21 @@ jobs:
       run: |
         echo "✅ Tests passed - Render will auto-deploy"
         echo "🚀 Deployment triggered for commit ${{ github.sha }}"
+    
+    - name: Send Success Notification
+      if: success()
+      run: |
+        echo "✅ Deployment successful for commit ${{ github.sha }}"
+    
+    - name: Send Failure Alert
+      if: failure()
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: '🚨 Deployment Blocked - Tests Failed',
+            body: `## ⚠️ Deployment Blocked\n\n**Commit:** ${context.sha}\n**Branch:** ${context.ref}\n**Author:** @${context.actor}\n\n**Reason:** Tests or quality checks failed.\n\nPlease check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for details.`,
+            labels: ['deployment-blocked', 'urgent']
+          })
