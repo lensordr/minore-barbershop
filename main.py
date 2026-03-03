@@ -1,21 +1,16 @@
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, Cookie
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-import models, crud, os
+import models
+import crud
+import os
 from database_postgres import get_db
-from email_service import (
-    send_appointment_email,
-    generate_cancel_token,
-    send_cancellation_email,
-)
+from email_service import send_appointment_email, send_cancellation_email
 import uvicorn
-import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
-import json
 from sse_starlette.sse import EventSourceResponse
 from contextlib import asynccontextmanager
 import time
@@ -93,11 +88,13 @@ if os.environ.get("RENDER_EXTERNAL_URL"):
                         print(
                             f"✅ Keep-alive: {response.status} at {current_hour}:00 CET"
                         )
-            except Exception as e:
-                print(f"Keep-alive error: {e}")
+            except Exception as keep_alive_error:
+                print(f"Keep-alive error: {keep_alive_error}")
         else:
             print(
-                f"💤 Outside business hours ({current_hour}:00 CET) - app should sleep"
+                "💤 Outside business hours ({current_hour}:00 CET) - app should sleep".format(
+                    current_hour=current_hour
+                )
             )
 
     # Keep-alive every 14 minutes to prevent Render sleep (15min timeout)
@@ -1127,7 +1124,7 @@ async def toggle_schedule(
 async def cleanup_daily(location: int = Form(None), db: Session = Depends(get_db)):
     if location is None:
         location = int(os.environ.get("DEFAULT_LOCATION", 1))
-    cleaned = crud.cleanup_daily_and_save_revenue(db)
+    crud.cleanup_daily_and_save_revenue(db)
     return RedirectResponse(
         url=f"/admin/dashboard?location={location}", status_code=303
     )
@@ -1385,7 +1382,7 @@ async def broadcast_update(update_type: str, data: dict = None):
         for queue in active_connections.copy():
             try:
                 queue.put_nowait(message)
-            except:
+            except Exception:
                 # Remove broken connections
                 if queue in active_connections:
                     active_connections.remove(queue)
@@ -1395,10 +1392,9 @@ async def broadcast_update(update_type: str, data: dict = None):
 async def check_refresh(last_check: str = "0"):
     try:
         last_check_float = float(last_check) if last_check != "undefined" else 0
-    except:
+    except Exception:
         last_check_float = 0
 
-    global last_booking_time
     return {
         "refresh_needed": last_booking_time > last_check_float,
         "timestamp": last_booking_time,
@@ -1477,5 +1473,5 @@ if __name__ == "__main__":
 @app.get("/sentry-debug")
 async def trigger_error():
     """Sentry verification endpoint - triggers test error"""
-    division_by_zero = 1 / 0
+    1 / 0  # noqa: F841
     return {"status": "never reached"}
