@@ -577,7 +577,7 @@ async def create_appointment_helper(
 
             threading.Thread(target=send_email_async, daemon=True).start()
         else:
-            print(f"No email provided - appointment created without email notification")
+            print("No email provided - appointment created without email notification")
 
         # Trigger instant dashboard refresh
         global last_booking_time
