@@ -496,7 +496,7 @@ def get_available_times_for_service(
     Get available time slots for a service
 
     VIP CODE RULES:
-    - VIP code allows booking 24 hours in advance (tomorrow from 1 PM)
+    - VIP code allows booking 24 hours in advance (tomorrow from 12 PM)
     - VIP code also allows booking TODAY but only slots AFTER 12 PM (noon)
     - Regular users: can only book today from 11 AM onwards
     """
@@ -527,9 +527,9 @@ def get_available_times_for_service(
         end_time = datetime.combine(
             tomorrow, datetime.min.time().replace(hour=schedule.end_hour)
         )
-        # VIP 24h advance: earliest slot is 1 PM (13:00)
+        # VIP 24h advance: earliest slot is 12 PM (noon)
         earliest_time = datetime.combine(
-            tomorrow, datetime.min.time().replace(hour=13, minute=0)
+            tomorrow, datetime.min.time().replace(hour=12, minute=0)
         )
     # Regular users or VIP booking for today
     else:
