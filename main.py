@@ -422,12 +422,31 @@ async def client_book_appointment(
     client_email: str = Form(""),
     client_phone: str = Form(...),
     service_id: int = Form(...),
-    barber_id: str = Form(...),
-    appointment_time: str = Form(...),
+    barber_id: str = Form(None),
+    appointment_time: str = Form(None),
     vip_code: str = Form(""),
     client_phone_cookie: str = Cookie(None, alias="client_phone"),
     db: Session = Depends(get_db),
 ):
+    if not barber_id or not appointment_time:
+        services = crud.get_services_by_location(
+            db, 1 if location.lower() == "mallorca" else 2
+        )
+        barbers = crud.get_active_barbers_by_location(
+            db, 1 if location.lower() == "mallorca" else 2
+        )
+        location_name = "Mallorca" if location.lower() == "mallorca" else "Concell"
+        return templates.TemplateResponse(
+            "booking.html",
+            {
+                "request": request,
+                "services": services,
+                "barbers": barbers,
+                "location": location_name,
+                "location_id": 1 if location.lower() == "mallorca" else 2,
+                "error": "Please select a barber and time slot.",
+            },
+        )
     location_id = 1 if location.lower() == "mallorca" else 2
     return await create_appointment_helper(
         request,

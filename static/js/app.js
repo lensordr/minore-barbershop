@@ -54,6 +54,21 @@ document.addEventListener('DOMContentLoaded', function() {
     const forms = document.querySelectorAll('form');
     forms.forEach(form => {
         form.addEventListener('submit', function(e) {
+            // Validate barber_id and appointment_time if they exist in this form
+            const barberId = form.querySelector('#barber_id');
+            const appointmentTime = form.querySelector('#appointment_time');
+
+            if (barberId && !barberId.value) {
+                e.preventDefault();
+                alert('Please select a barber before booking.');
+                return;
+            }
+            if (appointmentTime && (!appointmentTime.value || appointmentTime.disabled)) {
+                e.preventDefault();
+                alert('Please select an available time slot before booking.');
+                return;
+            }
+
             const submitBtn = form.querySelector('button[type="submit"]');
             if (submitBtn) {
                 const originalText = submitBtn.textContent;
