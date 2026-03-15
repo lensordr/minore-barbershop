@@ -173,25 +173,39 @@ def create_appointment(
 
     appointment_dt = datetime.fromisoformat(appointment_time)
     now = datetime.now()
+    today = now.date()
+    appointment_date = appointment_dt.date()
 
-    # Calculate next available slot
-    current_hour = now.hour
-    current_minute = now.minute
-
-    if current_minute < 30:
-        next_hour = current_hour
+    # Calculate next available slot for today
+    if now.minute < 30:
+        next_hour = now.hour
         next_minute = 30
     else:
-        next_hour = current_hour + 1
+        next_hour = now.hour + 1
         next_minute = 0
 
     earliest_time = datetime.combine(
-        now.date(), datetime.min.time().replace(hour=next_hour, minute=next_minute)
+        today, datetime.min.time().replace(hour=next_hour, minute=next_minute)
     )
 
-    # Check if appointment time is before the next available slot
-    if appointment_dt < earliest_time:
+    # Check if appointment time is before the next available slot (today only)
+    if appointment_date == today and appointment_dt < earliest_time:
         raise ValueError("Cannot book appointments in current or past time slots")
+
+    # Enforce VIP time restrictions at backend level
+    if is_vip:
+        vip_min_time = datetime.combine(
+            appointment_date, datetime.min.time().replace(hour=12, minute=0)
+        )
+        if appointment_dt < vip_min_time:
+            raise ValueError("VIP bookings can only start from 12:00 PM")
+    else:
+        # Regular users: cannot book before 11 AM
+        regular_min_time = datetime.combine(
+            appointment_date, datetime.min.time().replace(hour=11, minute=0)
+        )
+        if appointment_dt < regular_min_time:
+            raise ValueError("Bookings can only start from 11:00 AM")
 
     # Get service duration
     service = db.query(models.Service).filter(models.Service.id == service_id).first()
