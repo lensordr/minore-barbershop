@@ -34,7 +34,6 @@ def check_admin_auth(request: Request, admin_logged_in: str = Cookie(None)):
 async def lifespan(app: FastAPI):
     # Startup
     scheduler.start()
-    print("Keep-alive active during business hours (10 AM - 10 PM)")
     print("MINORE BARBER - Ready for appointments! v2")
     yield
     # Shutdown
@@ -67,39 +66,7 @@ last_booking_time = 0
 # Keep-alive scheduler - disabled for local development
 scheduler = AsyncIOScheduler()
 
-# Only enable keep-alive in production during business hours
 if os.environ.get("RENDER_EXTERNAL_URL"):
-
-    async def keep_alive():
-        """Keep app alive only during business hours (10 AM - 10 PM CET)"""
-        import aiohttp
-        from datetime import timezone, timedelta
-
-        cet = timezone(timedelta(hours=1))
-        current_time = datetime.now(cet)
-        current_hour = current_time.hour
-
-        # Only ping during business hours to save compute time
-        if 10 <= current_hour < 22:
-            try:
-                app_url = os.environ.get("RENDER_EXTERNAL_URL")
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(f"{app_url}/") as response:
-                        print(
-                            f"✅ Keep-alive: {response.status} at {current_hour}:00 CET"
-                        )
-            except Exception as keep_alive_error:
-                print(f"Keep-alive error: {keep_alive_error}")
-        else:
-            print(
-                "💤 Outside business hours ({current_hour}:00 CET) - app should sleep".format(
-                    current_hour=current_hour
-                )
-            )
-
-    # Keep-alive every 14 minutes to prevent Render sleep (15min timeout)
-    scheduler.add_job(keep_alive, "interval", minutes=14, id="keep_alive")
-
     from daily_revenue_email import send_daily_revenue_email
 
     scheduler.add_job(

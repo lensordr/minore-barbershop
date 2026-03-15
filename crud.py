@@ -215,26 +215,29 @@ def create_appointment(
     service_duration = service.duration
     appointment_end = appointment_dt + timedelta(minutes=service_duration)
 
-    # Check for time conflicts with existing appointments FOR THIS LOCATION
+    # Check for time conflicts - only query same day to avoid full table scan
+    day_start = datetime.combine(appointment_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
     existing_appointments = (
-        db.query(models.Appointment)
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Service.duration,
+        )
+        .join(models.Service)
         .filter(
             models.Appointment.barber_id == barber_id,
             models.Appointment.location_id == location_id,
             models.Appointment.status != "cancelled",
+            models.Appointment.appointment_time >= day_start,
+            models.Appointment.appointment_time < day_end,
         )
         .all()
     )
 
-    for existing in existing_appointments:
-        existing_duration = existing.custom_duration or existing.service.duration
-        existing_end = existing.appointment_time + timedelta(minutes=existing_duration)
-
-        # Check if appointments overlap
-        if (
-            appointment_dt < existing_end
-            and appointment_end > existing.appointment_time
-        ):
+    for apt_time, custom_dur, svc_dur in existing_appointments:
+        existing_end = apt_time + timedelta(minutes=custom_dur or svc_dur)
+        if appointment_dt < existing_end and appointment_end > apt_time:
             raise ValueError("Time slot conflicts with existing appointment")
 
     # Get or create client account
@@ -389,9 +392,7 @@ def get_today_appointments_ordered_by_location(db: Session, location_id: int):
 def get_appointments_by_date_and_location(db: Session, target_date, location_id: int):
     from sqlalchemy.orm import joinedload
 
-    # CRITICAL FIX #2: Use joinedload to prevent N+1 queries
-    # This loads all related data in ONE query instead of 100+ queries
-    appointments = (
+    return (
         db.query(models.Appointment)
         .join(models.Barber)
         .options(joinedload(models.Appointment.service))
@@ -405,18 +406,6 @@ def get_appointments_by_date_and_location(db: Session, target_date, location_id:
         .order_by(models.Appointment.appointment_time, models.Appointment.id)
         .all()
     )
-
-    # Debug logging
-    print(
-        f"📋 Loading {len(appointments)} appointments for location {location_id} on {target_date}:"
-    )
-    for apt in appointments:
-        barber_status = "active" if apt.barber.active else "inactive"
-        print(
-            f"  - ID={apt.id}, Name={apt.client_name}, Barber={apt.barber_id}({barber_status}), Time={apt.appointment_time.strftime('%H:%M')}, Status={apt.status}"
-        )
-
-    return appointments
 
 
 def get_today_appointment_counts(db: Session):
@@ -461,42 +450,32 @@ def get_today_appointment_counts_by_location(db: Session, location_id: int):
 def get_appointment_counts_by_date_and_location(
     db: Session, target_date, location_id: int
 ):
-    total = (
-        db.query(models.Appointment)
+    from sqlalchemy import func, case
+
+    result = (
+        db.query(
+            func.count(models.Appointment.id).label("total"),
+            func.sum(
+                case((models.Appointment.status == "completed", 1), else_=0)
+            ).label("completed"),
+            func.sum(
+                case((models.Appointment.status == "cancelled", 1), else_=0)
+            ).label("cancelled"),
+        )
         .join(models.Barber)
         .filter(
             models.Appointment.appointment_time >= target_date,
             models.Appointment.appointment_time < target_date + timedelta(days=1),
             models.Barber.location_id == location_id,
         )
-        .count()
+        .first()
     )
 
-    completed = (
-        db.query(models.Appointment)
-        .join(models.Barber)
-        .filter(
-            models.Appointment.appointment_time >= target_date,
-            models.Appointment.appointment_time < target_date + timedelta(days=1),
-            models.Appointment.status == "completed",
-            models.Barber.location_id == location_id,
-        )
-        .count()
-    )
-
-    cancelled = (
-        db.query(models.Appointment)
-        .join(models.Barber)
-        .filter(
-            models.Appointment.appointment_time >= target_date,
-            models.Appointment.appointment_time < target_date + timedelta(days=1),
-            models.Appointment.status == "cancelled",
-            models.Barber.location_id == location_id,
-        )
-        .count()
-    )
-
-    return {"total": total, "completed": completed, "cancelled": cancelled}
+    return {
+        "total": result.total or 0,
+        "completed": result.completed or 0,
+        "cancelled": result.cancelled or 0,
+    }
 
 
 def get_available_times_for_service(
@@ -704,12 +683,9 @@ def get_barbers_with_revenue(db: Session):
 
 def get_barbers_with_revenue_by_location(db: Session, location_id: int):
     from sqlalchemy import func
-    from sqlalchemy.orm import joinedload
 
-    # CRITICAL FIX #2: Eager load to prevent N+1
     barbers = (
         db.query(models.Barber)
-        .options(joinedload(models.Barber.appointments))
         .filter(models.Barber.location_id == location_id)
         .order_by(models.Barber.id)
         .all()
