@@ -634,7 +634,9 @@ async def admin_login(request: Request):
 
 @app.post("/admin/login")
 async def admin_login_post(username: str = Form(...), password: str = Form(...)):
-    if username == "admin" and password == "minore123":
+    valid_user = os.environ.get("ADMIN_USERNAME", "admin")
+    valid_pass = os.environ.get("ADMIN_PASSWORD", "minore123")
+    if username == valid_user and password == valid_pass:
         response = RedirectResponse(url="/admin/dashboard", status_code=303)
         response.set_cookie("admin_logged_in", "true")
         return response
@@ -1025,53 +1027,43 @@ async def add_manual_appointment(
     appointment_time: str = Form(...),
     duration: int = Form(...),
     price: float = Form(...),
+    location_id: int = Form(1),
     db: Session = Depends(get_db),
 ):
     try:
         phone = client_phone.strip() if client_phone else ""
         final_name = client_name.strip()
 
+        client = None
         if phone:
-            # Check if client exists and is blocked
             existing_client = crud.get_client_by_phone(db, phone)
             if existing_client and existing_client.blocked:
                 return {
                     "success": False,
                     "message": "This client is blocked and cannot make appointments",
                 }
-
-            # Get or create client with phone
             client = crud.get_or_create_client(db, phone, final_name, "")
-        else:
-            # No phone provided - create appointment without client link
-            client = None
 
-        # Create appointment
+        # Create appointment — pass client data directly, no re-fetch needed
         appointment_id = crud.create_appointment_lightning_fast(
-            db, final_name, service_id, barber_id, appointment_time, duration, price
+            db,
+            final_name,
+            service_id,
+            barber_id,
+            appointment_time,
+            duration,
+            price,
+            location_id=location_id,
+            client_id=client.id if client else None,
+            phone=client.phone if client else "",
+            email=client.email if client else "",
         )
-
-        # Link to client account if phone provided
-        if client:
-            appointment = (
-                db.query(models.Appointment)
-                .filter(models.Appointment.id == appointment_id)
-                .first()
-            )
-            if appointment:
-                appointment.client_id = client.id
-                appointment.phone = client.phone
-                appointment.email = client.email
-                db.commit()
 
         print(
-            f"✅ Manual appointment created: ID={appointment_id}, Name={final_name}, Phone={phone or 'None'}, Barber={barber_id}, Time={appointment_time}"
+            f"✅ Manual appointment created: ID={appointment_id}, Name={final_name}, Phone={phone or 'None'}, Barber={barber_id}, Time={appointment_time}, Location={location_id}"
         )
 
-        # Trigger dashboard refresh
         global last_booking_time
-        import time
-
         last_booking_time = time.time()
 
         return {"success": True, "message": f"Appointment added for {final_name}"}
@@ -1161,7 +1153,7 @@ async def revenue_reports(
 async def revenue_login_post(
     request: Request, password: str = Form(...), db: Session = Depends(get_db)
 ):
-    if password == "minorebarber2025":
+    if password == os.environ.get("REVENUE_PASSWORD", "minorebarber2025"):
         response = RedirectResponse(url="/admin/revenue", status_code=303)
         response.set_cookie("revenue_logged_in", "true")  # Session-based
         return response

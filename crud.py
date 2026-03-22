@@ -27,13 +27,34 @@ def get_or_create_client(db: Session, phone: str, name: str = "", email: str = "
 
 
 def get_all_clients(db: Session, phone_filter: str = None):
-    """Get clients with optional phone filter - optimized"""
-    query = db.query(models.Client)
+    """Get clients with optional phone filter, including total appointment count"""
+    from sqlalchemy import func
+
+    query = (
+        db.query(
+            models.Client,
+            func.count(models.Appointment.id).label("total_appointments"),
+        )
+        .outerjoin(
+            models.Appointment,
+            (models.Appointment.client_id == models.Client.id)
+            & (models.Appointment.status != "cancelled"),
+        )
+        .group_by(models.Client.id)
+    )
 
     if phone_filter:
         query = query.filter(models.Client.phone.like(f"%{phone_filter}%"))
 
-    return query.order_by(models.Client.created_at.desc()).limit(100).all()
+    rows = query.order_by(models.Client.created_at.desc()).limit(100).all()
+
+    # Attach count as attribute so templates can use client.total_appointments
+    clients = []
+    for client, count in rows:
+        client.total_appointments = count
+        clients.append(client)
+
+    return clients
 
 
 def toggle_client_block(db: Session, client_id: int):
@@ -273,28 +294,9 @@ def create_appointment(
     return appointment
 
 
-def create_appointment_admin(
-    db: Session,
-    client_name: str,
-    phone: str,
-    service_id: int,
-    barber_id: int,
-    appointment_time: str,
-):
-    appointment_dt = datetime.fromisoformat(appointment_time)
 
-    # Admin appointments: minimal validation for speed
-    appointment = models.Appointment(
-        client_name=client_name,
-        phone=phone,
-        service_id=service_id,
-        barber_id=barber_id,
-        appointment_time=appointment_dt,
-    )
-    db.add(appointment)
-    db.commit()
-    db.refresh(appointment)
-    return appointment
+
+
 
 
 def create_appointment_lightning_fast(
@@ -305,35 +307,26 @@ def create_appointment_lightning_fast(
     appointment_time: str,
     duration: int,
     price: float,
+    location_id: int = 1,
+    client_id: int = None,
+    phone: str = "",
+    email: str = "",
 ):
     appointment_dt = datetime.fromisoformat(appointment_time)
+    appointment_end = appointment_dt + timedelta(minutes=duration)
 
-    # CRITICAL: Check for exact time conflicts first
-    existing = (
-        db.query(models.Appointment)
-        .filter(
-            models.Appointment.barber_id == barber_id,
-            models.Appointment.appointment_time == appointment_dt,
-            models.Appointment.status != "cancelled",
-        )
-        .first()
-    )
-
-    if existing:
-        raise ValueError(
-            f"Time slot already booked by {existing.client_name} at {existing.appointment_time.strftime('%H:%M')}"
-        )
-
-    # Check for overlapping appointments manually
-    service_duration = duration
-    appointment_end = appointment_dt + timedelta(minutes=service_duration)
-
-    # Get all appointments for this barber on the same day
+    # Single query: fetch all same-day appointments for this barber (non-cancelled)
     day_start = datetime.combine(appointment_dt.date(), datetime.min.time())
     day_end = day_start + timedelta(days=1)
 
-    all_appointments = (
-        db.query(models.Appointment)
+    existing_appointments = (
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Appointment.client_name,
+            models.Service.duration,
+        )
+        .join(models.Service)
         .filter(
             models.Appointment.barber_id == barber_id,
             models.Appointment.status != "cancelled",
@@ -343,18 +336,13 @@ def create_appointment_lightning_fast(
         .all()
     )
 
-    # Check each appointment for overlap
-    for apt in all_appointments:
-        apt_duration = apt.custom_duration or apt.service.duration
-        apt_end = apt.appointment_time + timedelta(minutes=apt_duration)
-
-        # Check if appointments overlap
-        if appointment_dt < apt_end and appointment_end > apt.appointment_time:
+    for apt_time, custom_dur, apt_client, svc_dur in existing_appointments:
+        apt_end = apt_time + timedelta(minutes=custom_dur or svc_dur)
+        if appointment_dt < apt_end and appointment_end > apt_time:
             raise ValueError(
-                f"Time conflicts with {apt.client_name} at {apt.appointment_time.strftime('%H:%M')}"
+                f"Time conflicts with {apt_client} at {apt_time.strftime('%H:%M')}"
             )
 
-    # Safe appointment creation
     appointment = models.Appointment(
         client_name=client_name,
         service_id=service_id,
@@ -362,11 +350,14 @@ def create_appointment_lightning_fast(
         appointment_time=appointment_dt,
         custom_duration=duration,
         custom_price=price,
+        location_id=location_id,
         is_online=0,
+        client_id=client_id,
+        phone=phone,
+        email=email,
     )
     db.add(appointment)
     db.commit()
-    db.refresh(appointment)
     return appointment.id
 
 

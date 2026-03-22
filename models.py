@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Float, ForeignKey, Text, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -71,6 +71,13 @@ class Appointment(Base):
     client = relationship("Client", back_populates="appointments")
     barber = relationship("Barber", back_populates="appointments")
     service = relationship("Service", back_populates="appointments")
+
+    __table_args__ = (
+        # Speeds up conflict checks: barber + day range + status filter
+        Index("ix_appointments_barber_time_status", "barber_id", "appointment_time", "status"),
+        # Speeds up location-based dashboard queries
+        Index("ix_appointments_location_time", "location_id", "appointment_time"),
+    )
 
 
 class Schedule(Base):

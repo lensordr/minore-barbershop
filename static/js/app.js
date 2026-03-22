@@ -107,49 +107,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Check for new bookings with animation
+    // Check for new bookings - handled by admin_dashboard.html inline script
     if (window.location.pathname.includes('/admin/dashboard')) {
-        console.log('Dashboard detected, setting up refresh checker');
-        let lastCheck = Date.now() / 1000;
-        console.log('Starting refresh checker, lastCheck:', lastCheck);
-        
-        const refreshInterval = setInterval(() => {
-            fetch(`/api/check-refresh?last_check=${lastCheck}`)
-                .then(response => response.json())
-                .then(data => {
-                    console.log('Refresh check result:', data);
-                    
-                    // Stop polling if outside business hours
-                    if (data.business_hours === false) {
-                        console.log('Outside business hours - stopping refresh checker');
-                        clearInterval(refreshInterval);
-                        showNotification('Dashboard inactive outside business hours', 'error');
-                        return;
-                    }
-                    
-                    if (data.refresh_needed) {
-                        console.log('New booking detected, refreshing...');
-                        
-                        // Add loading animation
-                        const dashboard = document.querySelector('.dashboard');
-                        if (dashboard) {
-                            dashboard.classList.add('refreshing');
-                        }
-                        
-                        showNotification('New appointment booked! 📅', 'success');
-                        
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, 1000);
-                    }
-                    lastCheck = data.timestamp;
-                })
-                .catch(error => {
-                    if (!error.message.includes('message channel closed')) {
-                        console.log('Refresh check failed:', error);
-                    }
-                });
-        }, 1000);
+        console.log('Dashboard detected');
     }
     
     // Success page animation

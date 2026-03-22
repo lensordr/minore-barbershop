@@ -31,6 +31,7 @@
         <div class="clients-header">
             <span>Name</span>
             <span>Phone</span>
+            <span>Visits</span>
             <span>Status</span>
             <span>Actions</span>
         </div>
@@ -39,6 +40,7 @@
         <div class="client-row{% if client.blocked %} blocked-client{% endif %}">
             <span class="client-name">{{ client.name or "No name" }}</span>
             <span class="client-phone">{{ client.phone }}</span>
+            <span class="client-visits">{{ client.total_appointments or 0 }}</span>
             <span class="client-status">
                 {% if client.blocked %}
                     <span class="status-blocked">BLOCKED</span>
@@ -92,7 +94,7 @@
 
 .clients-header {
     display: grid;
-    grid-template-columns: 2fr 2fr 1fr 1fr;
+    grid-template-columns: 2fr 2fr 1fr 1fr 1fr;
     gap: 1rem;
     padding: 1rem;
     background: #f8f9fa;
@@ -102,7 +104,7 @@
 
 .client-row {
     display: grid;
-    grid-template-columns: 2fr 2fr 1fr 1fr;
+    grid-template-columns: 2fr 2fr 1fr 1fr 1fr;
     gap: 1rem;
     padding: 1rem;
     border-bottom: 1px solid #eee;

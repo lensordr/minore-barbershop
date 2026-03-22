@@ -142,10 +142,11 @@ function applyVipCode() {
 
 function updateAvailableTimes() {
     const vipCode = document.getElementById('vip_code')?.value || '';
-    const hasVipCode = vipCode.trim().length > 0;
+    // A VIP code is only valid if it starts with "VIP" (case-insensitive)
+    const hasValidVipCode = vipCode.trim().toUpperCase().startsWith('VIP') && vipCode.trim().length > 3;
     
     // Check if current time is before 11 AM (only for non-VIP users)
-    if (!hasVipCode) {
+    if (!hasValidVipCode) {
         const now = new Date();
         const currentHour = now.getHours();
         
