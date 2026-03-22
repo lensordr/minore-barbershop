@@ -22,54 +22,6 @@ A modern, minimalist web-based appointment system for barbershops.
 - 📋 Today's schedule overview
 - 📱 QR code generation for easy access
 
-## Quick Start
-
-1. **Install dependencies**
-```bash
-pip install -r requirements.txt
-```
-
-2. **Setup database**
-```bash
-python setup.py
-```
-
-3. **Configure email (optional)**
-```bash
-python setup_email.py
-```
-
-4. **Test email configuration (optional)**
-```bash
-python test_email.py
-```
-
-5. **Run the application**
-```bash
-python main.py
-```
-
-4. **Access the system**
-- Customer booking: http://localhost:8000/book
-- Admin dashboard: http://localhost:8000/admin/login
-- Default login: admin / minore123
-
-## Project Structure
-```
-MinoreBarbershop/
-├── main.py              # FastAPI application
-├── models.py            # Database models
-├── crud.py              # Database operations
-├── database.py          # Database session
-├── setup.py             # Initial setup
-├── static/
-│   ├── css/style.css    # Modern styling
-│   └── js/app.js        # JavaScript
-├── templates/           # HTML templates
-└── requirements.txt     # Dependencies
-```
-
-## Usage
 
 ### For Customers
 1. Scan QR code or visit booking URL
@@ -119,11 +71,5 @@ MinoreBarbershop/
 - Cancellation confirmation emails
 - Easy email configuration setup
 
-## Default Data
-- **Barbers**: Marco Silva, Antonio Rodriguez, Carlos Mendez
-- **Services**: Classic Haircut ($25), Beard Trim ($15), Hair + Beard ($35), etc.
-- **Hours**: 9:00 AM - 6:00 PM (30-minute slots)
-- **Admin Login**: admin / minore123
-
 ---
-Built for MINORE BARBERSHOP# Force redeploy
+Built for MINORE BARBERSHOP
