@@ -10,74 +10,60 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-    
+
     - name: Cache dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/pip
         key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install pytest pytest-cov flake8 black
-    
+        pip install pytest pytest-cov flake8 black bandit
+
     - name: Code Quality - Black (formatting)
-      run: |
-        black --check main.py crud.py models.py
-      continue-on-error: false
-    
+      run: black --check main.py crud.py models.py
+
     - name: Code Quality - Flake8 (linting)
-      run: |
-        flake8 main.py crud.py models.py --max-line-length=120 --ignore=E501,W503
-      continue-on-error: false
-    
-    - name: Run Unit Tests
-      run: |
-        pytest tests/ -v --cov=. --cov-report=term-missing
-      continue-on-error: false
-    
+      run: flake8 main.py crud.py models.py --max-line-length=120 --ignore=E501,W503
+
     - name: Security Check - Bandit
-      run: |
-        pip install bandit
-        bandit -r . -ll
-      continue-on-error: false
+      run: bandit -r main.py crud.py models.py email_service.py -ll
+
+    - name: Run Unit Tests
+      run: pytest tests/ -v --cov=. --cov-report=term-missing
 
   deploy:
     name: Deploy to Production
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
+
     steps:
     - name: Deploy to Render
       run: |
         echo "✅ Tests passed - Render will auto-deploy"
         echo "🚀 Deployment triggered for commit ${{ github.sha }}"
-    
-    - name: Send Success Notification
-      if: success()
-      run: |
-        echo "✅ Deployment successful for commit ${{ github.sha }}"
-    
+
     - name: Send Failure Alert
       if: failure()
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
         script: |
           github.rest.issues.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
             title: '🚨 Deployment Blocked - Tests Failed',
-            body: `## ⚠️ Deployment Blocked\n\n**Commit:** ${context.sha}\n**Branch:** ${context.ref}\n**Author:** @${context.actor}\n\n**Reason:** Tests or quality checks failed.\n\nPlease check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for details.`,
+            body: `## ⚠️ Deployment Blocked\n\n**Commit:** ${context.sha}\n**Branch:** ${context.ref}\n**Author:** @${context.actor}\n\nPlease check the [workflow run](${context.payload.repository.html_url}/actions/runs/${context.runId}) for details.`,
             labels: ['deployment-blocked', 'urgent']
           })

@@ -294,11 +294,6 @@ def create_appointment(
     return appointment
 
 
-
-
-
-
-
 def create_appointment_lightning_fast(
     db: Session,
     client_name: str,
@@ -1136,3 +1131,4 @@ def get_weekly_revenue(db: Session, date: str = None, location_id: int = None):
         "week_start": start_of_week.strftime("%Y-%m-%d"),
         "week_end": end_of_week.strftime("%Y-%m-%d"),
     }
+                                                                                                                                                                                                                                                                                                                                

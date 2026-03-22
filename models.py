@@ -74,7 +74,12 @@ class Appointment(Base):
 
     __table_args__ = (
         # Speeds up conflict checks: barber + day range + status filter
-        Index("ix_appointments_barber_time_status", "barber_id", "appointment_time", "status"),
+        Index(
+            "ix_appointments_barber_time_status",
+            "barber_id",
+            "appointment_time",
+            "status",
+        ),
         # Speeds up location-based dashboard queries
         Index("ix_appointments_location_time", "location_id", "appointment_time"),
     )
@@ -124,11 +129,4 @@ class DailyRevenue(Base):
 
 
 class AppointmentAuditLog(Base):
-    __tablename__ = "appointment_audit_log"
-
-    id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(Integer, index=True)
-    action = Column(String(50))  # created, updated, cancelled, completed
-    changed_by = Column(String(100))  # admin, client, system
-    changes = Column(Text)  # JSON string of what changed
-    timestamp = Column(DateTime, default=datetime.utcnow)
+ 
