@@ -1132,4 +1132,8 @@ def get_weekly_revenue(db: Session, date: str = None, location_id: int = None):
 
     return {
         "records": weekly_records,
-        "total_revenue": total_reve
+        "total_revenue": total_revenue,
+        "total_appointments": total_appointments,
+        "week_start": start_of_week.strftime("%Y-%m-%d"),
+        "week_end": end_of_week.strftime("%Y-%m-%d"),
+    }
