@@ -213,6 +213,10 @@ def create_appointment(
     if appointment_date == today and appointment_dt < earliest_time:
         raise ValueError("Cannot book appointments in current or past time slots")
 
+    # Regular users cannot book at all before 11 AM (regardless of slot time)
+    if not is_vip and now.hour < 11:
+        raise ValueError("Bookings are only available from 11:00 AM")
+
     # Enforce VIP time restrictions at backend level
     if is_vip:
         vip_min_time = datetime.combine(
@@ -520,6 +524,10 @@ def get_available_times_for_service(
             # After hours - no slots available
             return []
 
+        # Regular users cannot access booking before 11 AM
+        if not is_vip and now.hour < schedule.start_hour:
+            return []
+
         start_time = datetime.combine(
             today, datetime.min.time().replace(hour=schedule.start_hour)
         )
@@ -550,12 +558,10 @@ def get_available_times_for_service(
         # - Regular users: cannot book before 11 AM
         # - VIP users: cannot book before 12 PM (noon)
         if is_vip:
-            # VIP restriction: can only book slots AFTER 12 PM (noon) for today
             min_booking_time = datetime.combine(
                 today, datetime.min.time().replace(hour=12, minute=0)
             )
         else:
-            # Regular user restriction: can only book from 11 AM onwards
             min_booking_time = datetime.combine(
                 today, datetime.min.time().replace(hour=11, minute=0)
             )
@@ -1126,8 +1132,4 @@ def get_weekly_revenue(db: Session, date: str = None, location_id: int = None):
 
     return {
         "records": weekly_records,
-        "total_revenue": total_revenue,
-        "total_appointments": total_appointments,
-        "week_start": start_of_week.strftime("%Y-%m-%d"),
-        "week_end": end_of_week.strftime("%Y-%m-%d"),
-    }
+        "total_revenue": total_reve

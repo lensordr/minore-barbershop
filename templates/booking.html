@@ -140,22 +140,33 @@ function applyVipCode() {
     }
 }
 
+// On page load: block access before 11 AM for non-VIP users
+(function() {
+    const vipCode = document.getElementById('vip_code')?.value || '';
+    const hasValidVipCode = vipCode.trim().toUpperCase().startsWith('VIP') && vipCode.trim().length > 3;
+    if (!hasValidVipCode && new Date().getHours() < 11) {
+        document.getElementById('bookingForm').style.display = 'none';
+        const msg = document.createElement('div');
+        msg.style.cssText = 'background:#2a2a2a;color:#fbcc93;padding:2rem;border-radius:8px;text-align:center;margin-top:2rem;font-size:1.1rem;';
+        msg.innerHTML = '🕐 Bookings open at <strong>11:00 AM</strong>.<br><br>Come back then to book your appointment.';
+        document.getElementById('bookingForm').parentNode.insertBefore(msg, document.getElementById('bookingForm'));
+    }
+})();
+
 function updateAvailableTimes() {
     const vipCode = document.getElementById('vip_code')?.value || '';
     // A VIP code is only valid if it starts with "VIP" (case-insensitive)
     const hasValidVipCode = vipCode.trim().toUpperCase().startsWith('VIP') && vipCode.trim().length > 3;
-    
-    // Check if current time is before 11 AM (only for non-VIP users)
-    if (!hasValidVipCode) {
-        const now = new Date();
-        const currentHour = now.getHours();
-        
-        if (currentHour < 11) {
-            alert('Appointments are available starting 11 AM');
-            document.getElementById('appointment_time').innerHTML = '<option value="">Appointments available from 11 AM</option>';
-            document.getElementById('appointment_time').disabled = true;
-            return;
-        }
+
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    // Block regular users from seeing any slots before 11 AM
+    if (!hasValidVipCode && currentHour < 11) {
+        const timeSelect = document.getElementById('appointment_time');
+        timeSelect.innerHTML = '<option value="">Bookings open at 11:00 AM</option>';
+        timeSelect.disabled = true;
+        return;
     }
     
     const barberId = document.getElementById('barber_id').value;
@@ -255,23 +266,4 @@ function updateAvailableTimes() {
 }
 
 // Barber list selection
-document.querySelectorAll('.barber-item').forEach(item => {
-    item.addEventListener('click', function() {
-        // Remove selected class from all items
-        document.querySelectorAll('.barber-item').forEach(i => i.classList.remove('selected'));
-        
-        // Add selected class to clicked item
-        this.classList.add('selected');
-        
-        // Set hidden input value
-        const barberId = this.getAttribute('data-barber-id');
-        document.getElementById('barber_id').value = barberId;
-        
-        // Update available times
-        updateAvailableTimes();
-    });
-});
-
-document.getElementById('service_id').addEventListener('change', updateAvailableTimes);
-</script>
-{% endblock %}
+document.que
