@@ -133,23 +133,38 @@
 <script>
 function applyVipCode() {
     const vipCode = document.getElementById('vip_code').value.trim();
-    if (vipCode) {
+    if (!vipCode) return;
+    const hasValidVipCode = vipCode.toUpperCase().startsWith('VIP') && vipCode.length > 3;
+    if (hasValidVipCode) {
+        // Valid VIP code — reload page with it so backend validates and unlocks barbers
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.set('vip_code', vipCode);
+        window.location.href = currentUrl.toString();
+    } else {
+        // Invalid code typed — just reload to apply
         const currentUrl = new URL(window.location.href);
         currentUrl.searchParams.set('vip_code', vipCode);
         window.location.href = currentUrl.toString();
     }
 }
 
-// On page load: block access before 11 AM for non-VIP users
+// On page load: if before 11 AM and no VIP code, show warning but keep VIP field visible
 (function() {
     const vipCode = document.getElementById('vip_code')?.value || '';
     const hasValidVipCode = vipCode.trim().toUpperCase().startsWith('VIP') && vipCode.trim().length > 3;
     if (!hasValidVipCode && new Date().getHours() < 11) {
-        document.getElementById('bookingForm').style.display = 'none';
+        // Hide everything except the VIP code field
+        const form = document.getElementById('bookingForm');
+        const sections = form.querySelectorAll('.form-group:not(:has(#vip_code)), .barber-list, .client-info-display, button[type="submit"]');
+        sections.forEach(el => el.style.display = 'none');
+
+        // Show message above the VIP field
+        const vipGroup = document.getElementById('vip_code').closest('.form-group');
         const msg = document.createElement('div');
-        msg.style.cssText = 'background:#2a2a2a;color:#fbcc93;padding:2rem;border-radius:8px;text-align:center;margin-top:2rem;font-size:1.1rem;';
-        msg.innerHTML = '🕐 Bookings open at <strong>11:00 AM</strong>.<br><br>Come back then to book your appointment.';
-        document.getElementById('bookingForm').parentNode.insertBefore(msg, document.getElementById('bookingForm'));
+        msg.id = 'pre11msg';
+        msg.style.cssText = 'background:#2a2a2a;color:#fbcc93;padding:1.5rem;border-radius:8px;text-align:center;margin-bottom:1rem;font-size:1rem;';
+        msg.innerHTML = '🕐 Bookings open at <strong>11:00 AM</strong>.<br><small style="opacity:0.8">Have a VIP code? Enter it below for early access.</small>';
+        vipGroup.parentNode.insertBefore(msg, vipGroup);
     }
 })();
 
