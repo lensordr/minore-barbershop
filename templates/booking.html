@@ -240,21 +240,28 @@ function updateAvailableTimes() {
 // Barber list selection
 document.querySelectorAll('.barber-item').forEach(item => {
     item.addEventListener('click', function() {
-        // Remove selected class from all items
         document.querySelectorAll('.barber-item').forEach(i => i.classList.remove('selected'));
-        
-        // Add selected class to clicked item
         this.classList.add('selected');
-        
-        // Set hidden input value
-        const barberId = this.getAttribute('data-barber-id');
-        document.getElementById('barber_id').value = barberId;
-        
-        // Update available times
+        document.getElementById('barber_id').value = this.getAttribute('data-barber-id');
         updateAvailableTimes();
     });
 });
 
 document.getElementById('service_id').addEventListener('change', updateAvailableTimes);
+
+// VIP: auto-select the single barber on page load
+{% if vip_barber %}
+(function() {
+    const barberItem = document.querySelector('.barber-item[data-barber-id="{{ vip_barber.id }}"]');
+    if (barberItem) {
+        barberItem.classList.add('selected');
+        document.getElementById('barber_id').value = '{{ vip_barber.id }}';
+        // If a service is already selected, load times immediately
+        if (document.getElementById('service_id').value) {
+            updateAvailableTimes();
+        }
+    }
+})();
+{% endif %}
 </script>
 {% endblock %}
