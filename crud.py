@@ -200,7 +200,8 @@ def create_appointment(
         raise ValueError("This client is blocked and cannot make appointments")
 
     appointment_dt = datetime.fromisoformat(appointment_time)
-    now = datetime.now()
+    from zoneinfo import ZoneInfo
+    now = datetime.now(ZoneInfo("Europe/Madrid")).replace(tzinfo=None)
     today = now.date()
     appointment_date = appointment_dt.date()
 
@@ -483,7 +484,10 @@ def get_available_times_for_service(
     use_tomorrow: bool = False,
     schedule=None,
 ):
-    now = datetime.now()
+    # Always use CET (Barcelona time) — server runs on UTC
+    from zoneinfo import ZoneInfo
+    cet = ZoneInfo("Europe/Madrid")
+    now = datetime.now(cet).replace(tzinfo=None)
     today = now.date()
 
     # Accept pre-fetched schedule to avoid repeated DB calls
