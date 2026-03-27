@@ -282,6 +282,7 @@ async def client_book_location(
                     "client": client,
                     "vip_code": vip_code,
                     "vip_barber": None,
+                    "show_random": False,
                     "error": vip_error,
                 },
             )
@@ -302,6 +303,7 @@ async def client_book_location(
             "client": client,
             "vip_code": vip_code,
             "vip_barber": vip_barber,
+            "show_random": not vip_barber,  # No random when VIP barber is selected
         },
     )
 
