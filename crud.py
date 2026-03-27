@@ -98,6 +98,13 @@ def get_active_barbers_by_location(db: Session, location_id: int):
     )
 
 
+def get_all_barbers_by_location(db: Session, location_id: int):
+    """All barbers for a location regardless of active status — used for VIP code validation"""
+    return (
+        db.query(models.Barber).filter(models.Barber.location_id == location_id).all()
+    )
+
+
 def get_services(db: Session):
     return db.query(models.Service).all()
 

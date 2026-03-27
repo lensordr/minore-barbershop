@@ -246,24 +246,50 @@ async def client_book_location(
     location_name = "Mallorca" if location_id == 1 else "Concell"
 
     services = crud.get_services_by_location(db, location_id)
-    barbers = crud.get_active_barbers_by_location(db, location_id)
 
     # Filter barbers by VIP code if provided
     vip_barber = None
+    vip_error = None
     if vip_code and vip_code.strip():
         vip_code_upper = vip_code.strip().upper()
         if vip_code_upper.startswith("VIP"):
             barber_name = vip_code_upper[3:]  # Remove "VIP" prefix
-            vip_barber = next(
-                (
-                    b
-                    for b in barbers
-                    if b.name.upper() == barber_name and b.early_access_enabled
-                ),
+            # Search ALL barbers (including inactive) for this location
+            all_location_barbers = crud.get_all_barbers_by_location(db, location_id)
+            matched = next(
+                (b for b in all_location_barbers if b.name.upper() == barber_name),
                 None,
             )
-            if vip_barber:
-                barbers = [vip_barber]  # Show only VIP barber
+            if not matched:
+                vip_error = f"VIP code '{vip_code.upper()}' is not valid."
+            elif not matched.early_access_enabled:
+                vip_error = f"{matched.name} does not have VIP early access enabled."
+            elif not matched.active:
+                vip_error = f"{matched.name} is not available today. Please try again later or book without a VIP code after 11:00 AM."
+            else:
+                vip_barber = matched
+
+        if vip_error:
+            # Show error — render page with no barbers so nothing can be booked
+            return templates.TemplateResponse(
+                "booking.html",
+                {
+                    "request": request,
+                    "services": services,
+                    "barbers": [],
+                    "location": location_name,
+                    "location_id": location_id,
+                    "client": client,
+                    "vip_code": vip_code,
+                    "vip_barber": None,
+                    "error": vip_error,
+                },
+            )
+
+    if vip_barber:
+        barbers = [vip_barber]
+    else:
+        barbers = crud.get_active_barbers_by_location(db, location_id)
 
     return templates.TemplateResponse(
         "booking.html",
