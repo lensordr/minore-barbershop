@@ -1,0 +1,1114 @@
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+import models
+
+
+# Client management functions
+def get_or_create_client(db: Session, phone: str, name: str = "", email: str = ""):
+    """Get existing client or create new one based on phone number"""
+    client = db.query(models.Client).filter(models.Client.phone == phone).first()
+
+    if not client:
+        client = models.Client(
+            phone=phone, name=name, email=email, created_at=datetime.now()
+        )
+        db.add(client)
+        db.commit()
+        db.refresh(client)
+    else:
+        # Update client info if provided
+        if name and name != client.name:
+            client.name = name
+        if email and email != client.email:
+            client.email = email
+        db.commit()
+
+    return client
+
+
+def get_all_clients(db: Session, phone_filter: str = None):
+    """Get clients with optional phone filter, including total appointment count"""
+    from sqlalchemy import func
+
+    query = (
+        db.query(
+            models.Client,
+            func.count(models.Appointment.id).label("total_appointments"),
+        )
+        .outerjoin(
+            models.Appointment,
+            (models.Appointment.client_id == models.Client.id)
+            & (models.Appointment.status != "cancelled"),
+        )
+        .group_by(models.Client.id)
+    )
+
+    if phone_filter:
+        query = query.filter(models.Client.phone.like(f"%{phone_filter}%"))
+
+    rows = query.order_by(models.Client.created_at.desc()).limit(100).all()
+
+    # Attach count as attribute so templates can use client.total_appointments
+    clients = []
+    for client, count in rows:
+        client.total_appointments = count
+        clients.append(client)
+
+    return clients
+
+
+def toggle_client_block(db: Session, client_id: int):
+    """Toggle client blocked status"""
+    client = db.query(models.Client).filter(models.Client.id == client_id).first()
+    if client:
+        client.blocked = 1 - client.blocked  # Toggle between 0 and 1
+        db.commit()
+        db.refresh(client)
+    return client
+
+
+def get_client_by_phone(db: Session, phone: str):
+    """Get client by phone number"""
+    return db.query(models.Client).filter(models.Client.phone == phone).first()
+
+
+def get_client_appointments(db: Session, client_id: int):
+    """Get all appointments for a client"""
+    return (
+        db.query(models.Appointment)
+        .filter(models.Appointment.client_id == client_id)
+        .order_by(models.Appointment.appointment_time.desc())
+        .all()
+    )
+
+
+def get_barbers(db: Session):
+    return db.query(models.Barber).all()
+
+
+def get_active_barbers(db: Session):
+    return db.query(models.Barber).filter(models.Barber.active == 1).all()
+
+
+def get_active_barbers_by_location(db: Session, location_id: int):
+    return (
+        db.query(models.Barber)
+        .filter(models.Barber.active == 1, models.Barber.location_id == location_id)
+        .all()
+    )
+
+
+def get_all_barbers_by_location(db: Session, location_id: int):
+    """All barbers for a location regardless of active status — used for VIP code validation"""
+    return (
+        db.query(models.Barber).filter(models.Barber.location_id == location_id).all()
+    )
+
+
+def get_services(db: Session):
+    return db.query(models.Service).all()
+
+
+def get_services_by_location(db: Session, location_id: int):
+    return (
+        db.query(models.Service).filter(models.Service.location_id == location_id).all()
+    )
+
+
+def get_service_by_id(db: Session, service_id: int):
+    return db.query(models.Service).filter(models.Service.id == service_id).first()
+
+
+def get_barber_by_id(db: Session, barber_id: int):
+    return db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+
+
+def create_barber(db: Session, name: str, location_id: int = 1):
+    barber = models.Barber(name=name, location_id=location_id)
+    db.add(barber)
+    db.commit()
+    db.refresh(barber)
+    return barber
+
+
+def create_service(
+    db: Session,
+    name: str,
+    duration: int,
+    price: float,
+    description: str = "",
+    location_id: int = 1,
+):
+    service = models.Service(
+        name=name,
+        duration=duration,
+        price=price,
+        description=description,
+        location_id=location_id,
+    )
+    db.add(service)
+    db.commit()
+    db.refresh(service)
+    return service
+
+
+def update_service(
+    db: Session,
+    service_id: int,
+    name: str,
+    duration: int,
+    price: float,
+    description: str,
+):
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if service:
+        service.name = name
+        service.duration = duration
+        service.price = price
+        service.description = description
+        db.commit()
+        db.refresh(service)
+    return service
+
+
+def delete_service(db: Session, service_id: int):
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if service:
+        db.delete(service)
+        db.commit()
+    return service
+
+
+def create_appointment(
+    db: Session,
+    client_name: str,
+    email: str,
+    phone: str,
+    service_id: int,
+    barber_id: int,
+    appointment_time: str,
+    vip_extra_price: float = 0,
+    is_vip: bool = False,
+    location_id: int = 1,
+):
+    if not phone or phone.strip() == "":
+        raise ValueError("Phone number is required")
+
+    # Check if client is blocked
+    client = get_client_by_phone(db, phone)
+    if client and client.blocked:
+        raise ValueError("This client is blocked and cannot make appointments")
+
+    appointment_dt = datetime.fromisoformat(appointment_time)
+    now = datetime.now()
+    today = now.date()
+    appointment_date = appointment_dt.date()
+
+    # Calculate next available slot for today
+    if now.minute < 30:
+        next_hour = now.hour
+        next_minute = 30
+    else:
+        next_hour = now.hour + 1
+        next_minute = 0
+
+    earliest_time = datetime.combine(
+        today, datetime.min.time().replace(hour=next_hour, minute=next_minute)
+    )
+
+    # Check if appointment time is before the next available slot (today only)
+    if appointment_date == today and appointment_dt < earliest_time:
+        raise ValueError("Cannot book appointments in current or past time slots")
+
+    # Regular users cannot book at all before 11 AM (regardless of slot time)
+    if not is_vip and now.hour < 11:
+        raise ValueError("Bookings are only available from 11:00 AM")
+
+    # Enforce VIP time restrictions at backend level
+    if is_vip:
+        vip_min_time = datetime.combine(
+            appointment_date, datetime.min.time().replace(hour=12, minute=0)
+        )
+        if appointment_dt < vip_min_time:
+            raise ValueError("VIP bookings can only start from 12:00 PM")
+    else:
+        # Regular users: cannot book before 11 AM
+        regular_min_time = datetime.combine(
+            appointment_date, datetime.min.time().replace(hour=11, minute=0)
+        )
+        if appointment_dt < regular_min_time:
+            raise ValueError("Bookings can only start from 11:00 AM")
+
+    # Get service duration
+    service = db.query(models.Service).filter(models.Service.id == service_id).first()
+    if not service:
+        raise ValueError("Service not found")
+
+    service_duration = service.duration
+    appointment_end = appointment_dt + timedelta(minutes=service_duration)
+
+    # Check for time conflicts - only query same day to avoid full table scan
+    day_start = datetime.combine(appointment_date, datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+    existing_appointments = (
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Service.duration,
+        )
+        .join(models.Service)
+        .filter(
+            models.Appointment.barber_id == barber_id,
+            models.Appointment.location_id == location_id,
+            models.Appointment.status != "cancelled",
+            models.Appointment.appointment_time >= day_start,
+            models.Appointment.appointment_time < day_end,
+        )
+        .all()
+    )
+
+    for apt_time, custom_dur, svc_dur in existing_appointments:
+        existing_end = apt_time + timedelta(minutes=custom_dur or svc_dur)
+        if appointment_dt < existing_end and appointment_end > apt_time:
+            raise ValueError("Time slot conflicts with existing appointment")
+
+    # Get or create client account
+    client = get_or_create_client(db, phone, client_name, email)
+
+    from email_service import generate_cancel_token
+
+    cancel_token = generate_cancel_token()
+
+    # Calculate final price with VIP extra
+    final_price = service.price + vip_extra_price if vip_extra_price > 0 else None
+
+    # Set is_online: 2 for VIP, 1 for regular online
+    online_status = 2 if is_vip else 1
+
+    appointment = models.Appointment(
+        client_id=client.id,
+        appointment_time=appointment_dt,
+        service_id=service_id,
+        barber_id=barber_id,
+        cancel_token=cancel_token,
+        is_online=online_status,
+        custom_price=final_price,
+        location_id=location_id,
+        # Legacy fields for compatibility
+        client_name=client_name,
+        phone=phone,
+        email=email,
+    )
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+    return appointment
+
+
+def create_appointment_lightning_fast(
+    db: Session,
+    client_name: str,
+    service_id: int,
+    barber_id: int,
+    appointment_time: str,
+    duration: int,
+    price: float,
+    location_id: int = 1,
+    client_id: int = None,
+    phone: str = "",
+    email: str = "",
+):
+    appointment_dt = datetime.fromisoformat(appointment_time)
+    appointment_end = appointment_dt + timedelta(minutes=duration)
+
+    # Single query: fetch all same-day appointments for this barber (non-cancelled)
+    day_start = datetime.combine(appointment_dt.date(), datetime.min.time())
+    day_end = day_start + timedelta(days=1)
+
+    existing_appointments = (
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Appointment.client_name,
+            models.Service.duration,
+        )
+        .join(models.Service)
+        .filter(
+            models.Appointment.barber_id == barber_id,
+            models.Appointment.status != "cancelled",
+            models.Appointment.appointment_time >= day_start,
+            models.Appointment.appointment_time < day_end,
+        )
+        .all()
+    )
+
+    for apt_time, custom_dur, apt_client, svc_dur in existing_appointments:
+        apt_end = apt_time + timedelta(minutes=custom_dur or svc_dur)
+        if appointment_dt < apt_end and appointment_end > apt_time:
+            raise ValueError(
+                f"Time conflicts with {apt_client} at {apt_time.strftime('%H:%M')}"
+            )
+
+    appointment = models.Appointment(
+        client_name=client_name,
+        service_id=service_id,
+        barber_id=barber_id,
+        appointment_time=appointment_dt,
+        custom_duration=duration,
+        custom_price=price,
+        location_id=location_id,
+        is_online=0,
+        client_id=client_id,
+        phone=phone,
+        email=email,
+    )
+    db.add(appointment)
+    db.commit()
+    return appointment.id
+
+
+def get_today_appointments_ordered(db: Session):
+    today = datetime.now().date()
+    return (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status != "cancelled",
+        )
+        .order_by(models.Appointment.appointment_time)
+        .all()
+    )
+
+
+def get_today_appointments_ordered_by_location(db: Session, location_id: int):
+    today = datetime.now().date()
+    return get_appointments_by_date_and_location(db, today, location_id)
+
+
+def get_appointments_by_date_and_location(db: Session, target_date, location_id: int):
+    from sqlalchemy.orm import joinedload
+
+    return (
+        db.query(models.Appointment)
+        .join(models.Barber)
+        .options(joinedload(models.Appointment.service))
+        .options(joinedload(models.Appointment.barber))
+        .options(joinedload(models.Appointment.client))
+        .filter(
+            models.Appointment.appointment_time >= target_date,
+            models.Appointment.appointment_time < target_date + timedelta(days=1),
+            models.Barber.location_id == location_id,
+        )
+        .order_by(models.Appointment.appointment_time, models.Appointment.id)
+        .all()
+    )
+
+
+def get_today_appointment_counts(db: Session):
+    today = datetime.now().date()
+    total = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+        )
+        .count()
+    )
+
+    completed = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "completed",
+        )
+        .count()
+    )
+
+    cancelled = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "cancelled",
+        )
+        .count()
+    )
+
+    return {"total": total, "completed": completed, "cancelled": cancelled}
+
+
+def get_today_appointment_counts_by_location(db: Session, location_id: int):
+    today = datetime.now().date()
+    return get_appointment_counts_by_date_and_location(db, today, location_id)
+
+
+def get_appointment_counts_by_date_and_location(
+    db: Session, target_date, location_id: int
+):
+    from sqlalchemy import func, case
+
+    result = (
+        db.query(
+            func.count(models.Appointment.id).label("total"),
+            func.sum(
+                case((models.Appointment.status == "completed", 1), else_=0)
+            ).label("completed"),
+            func.sum(
+                case((models.Appointment.status == "cancelled", 1), else_=0)
+            ).label("cancelled"),
+        )
+        .join(models.Barber)
+        .filter(
+            models.Appointment.appointment_time >= target_date,
+            models.Appointment.appointment_time < target_date + timedelta(days=1),
+            models.Barber.location_id == location_id,
+        )
+        .first()
+    )
+
+    return {
+        "total": result.total or 0,
+        "completed": result.completed or 0,
+        "cancelled": result.cancelled or 0,
+    }
+
+
+def get_available_times_for_service(
+    db: Session,
+    barber_id: int,
+    service_id: int,
+    is_vip: bool = False,
+    use_tomorrow: bool = False,
+    schedule=None,
+):
+    now = datetime.now()
+    today = now.date()
+
+    # Accept pre-fetched schedule to avoid repeated DB calls
+    if schedule is None:
+        schedule = get_schedule(db)
+
+    if not schedule.is_open:
+        return []
+
+    # Get service duration in a single targeted query
+    service_duration = (
+        db.query(models.Service.duration)
+        .filter(models.Service.id == service_id)
+        .scalar()
+    )
+    if not service_duration:
+        return []
+
+    # VIP users booking for tomorrow (24h advance)
+    if is_vip and use_tomorrow:
+        tomorrow = today + timedelta(days=1)
+        if tomorrow.weekday() == 6:
+            return []
+        start_time = datetime.combine(
+            tomorrow, datetime.min.time().replace(hour=schedule.start_hour)
+        )
+        end_time = datetime.combine(
+            tomorrow, datetime.min.time().replace(hour=schedule.end_hour)
+        )
+        earliest_time = datetime.combine(
+            tomorrow, datetime.min.time().replace(hour=12, minute=0)
+        )
+    else:
+        if today.weekday() == 6:
+            return []
+        if now.hour >= schedule.end_hour:
+            return []
+        if not is_vip and now.hour < schedule.start_hour:
+            return []
+
+        start_time = datetime.combine(
+            today, datetime.min.time().replace(hour=schedule.start_hour)
+        )
+        end_time = datetime.combine(
+            today, datetime.min.time().replace(hour=schedule.end_hour)
+        )
+
+        if now.minute == 0:
+            next_hour, next_minute = now.hour, 0
+        elif now.minute <= 30:
+            next_hour, next_minute = now.hour, 30
+        else:
+            next_hour, next_minute = now.hour + 1, 0
+
+        if next_hour < schedule.start_hour:
+            earliest_time = start_time
+        else:
+            earliest_time = datetime.combine(
+                today, datetime.min.time().replace(hour=next_hour, minute=next_minute)
+            )
+
+        min_booking_time = datetime.combine(
+            today,
+            datetime.min.time().replace(hour=12 if is_vip else 11, minute=0),
+        )
+        if earliest_time < min_booking_time:
+            earliest_time = min_booking_time
+
+    # Single query — only fetch the columns needed, no lazy loads
+    existing_appointments = (
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Service.duration,
+        )
+        .join(models.Service)
+        .filter(
+            models.Appointment.barber_id == barber_id,
+            models.Appointment.appointment_time >= start_time,
+            models.Appointment.appointment_time <= end_time,
+            models.Appointment.status != "cancelled",
+        )
+        .all()
+    )
+
+    # Pre-compute booked intervals once
+    booked = [
+        (apt_time, apt_time + timedelta(minutes=custom_dur or svc_dur))
+        for apt_time, custom_dur, svc_dur in existing_appointments
+    ]
+
+    available_times = []
+    current = start_time
+    while current < end_time:
+        if current >= earliest_time:
+            service_end = current + timedelta(minutes=service_duration)
+            if service_end <= end_time:
+                if not any(
+                    current < end and service_end > start for start, end in booked
+                ):
+                    available_times.append(current.strftime("%H:%M"))
+        current += timedelta(minutes=30)
+
+    return available_times
+
+
+def get_barber_revenue(db: Session, barber_id: int, date: datetime.date = None):
+    if date is None:
+        date = datetime.now().date()
+
+    appointments = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.barber_id == barber_id,
+            models.Appointment.appointment_time >= date,
+            models.Appointment.appointment_time < date + timedelta(days=1),
+            models.Appointment.status == "completed",
+        )
+        .all()
+    )
+
+    total = sum(appointment.service.price for appointment in appointments)
+    return total
+
+
+def get_barbers_with_revenue(db: Session):
+    barbers = get_barbers(db)
+    today = datetime.now().date()
+
+    for barber in barbers:
+        # Get today's completed appointments
+        completed_appointments = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.barber_id == barber.id,
+                models.Appointment.appointment_time >= today,
+                models.Appointment.appointment_time < today + timedelta(days=1),
+                models.Appointment.status == "completed",
+            )
+            .all()
+        )
+
+        barber.today_revenue = sum(
+            apt.custom_price or apt.service.price for apt in completed_appointments
+        )
+        barber.today_appointments = len(completed_appointments)
+
+        # Get total scheduled appointments for today (exclude cancelled and completed)
+        scheduled_today = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.barber_id == barber.id,
+                models.Appointment.appointment_time >= today,
+                models.Appointment.appointment_time < today + timedelta(days=1),
+                models.Appointment.status == "scheduled",
+            )
+            .count()
+        )
+
+        barber.total_today_appointments = scheduled_today + len(completed_appointments)
+
+    return barbers
+
+
+def get_barbers_with_revenue_by_location(db: Session, location_id: int):
+    from sqlalchemy import func
+
+    barbers = (
+        db.query(models.Barber)
+        .filter(models.Barber.location_id == location_id)
+        .order_by(models.Barber.id)
+        .all()
+    )
+    today = datetime.now().date()
+
+    # Single query for all barber stats
+    stats = (
+        db.query(
+            models.Appointment.barber_id,
+            func.sum(
+                func.coalesce(models.Appointment.custom_price, models.Service.price)
+            ).label("revenue"),
+            func.count(models.Appointment.id).label("completed_count"),
+        )
+        .join(models.Service)
+        .filter(
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "completed",
+        )
+        .group_by(models.Appointment.barber_id)
+        .all()
+    )
+
+    # Single query for scheduled counts
+    scheduled_stats = (
+        db.query(
+            models.Appointment.barber_id,
+            func.count(models.Appointment.id).label("scheduled_count"),
+        )
+        .filter(
+            models.Appointment.appointment_time >= today,
+            models.Appointment.appointment_time < today + timedelta(days=1),
+            models.Appointment.status == "scheduled",
+        )
+        .group_by(models.Appointment.barber_id)
+        .all()
+    )
+
+    # Create lookup dictionaries
+    revenue_lookup = {
+        stat.barber_id: (stat.revenue or 0, stat.completed_count) for stat in stats
+    }
+    scheduled_lookup = {
+        stat.barber_id: stat.scheduled_count for stat in scheduled_stats
+    }
+
+    for barber in barbers:
+        revenue, completed = revenue_lookup.get(barber.id, (0, 0))
+        scheduled = scheduled_lookup.get(barber.id, 0)
+
+        barber.today_revenue = revenue
+        barber.today_appointments = completed
+        barber.total_today_appointments = scheduled + completed
+
+    return barbers
+
+
+def checkout_appointment_ultra_fast(db: Session, appointment_id: int):
+    # Safe ORM update instead of raw SQL
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.id == appointment_id)
+        .first()
+    )
+    if not appointment or appointment.status == "completed":
+        return False
+
+    appointment.status = "completed"
+
+    # Fast revenue update
+    today = datetime.now().date()
+    revenue_amount = appointment.custom_price or appointment.service.price
+
+    # Upsert monthly revenue
+    monthly_record = (
+        db.query(models.MonthlyRevenue)
+        .filter(
+            models.MonthlyRevenue.barber_id == appointment.barber_id,
+            models.MonthlyRevenue.year == today.year,
+            models.MonthlyRevenue.month == today.month,
+        )
+        .first()
+    )
+
+    if monthly_record:
+        monthly_record.revenue += revenue_amount
+        monthly_record.appointments_count += 1
+    else:
+        monthly_record = models.MonthlyRevenue(
+            barber_id=appointment.barber_id,
+            year=today.year,
+            month=today.month,
+            revenue=revenue_amount,
+            appointments_count=1,
+        )
+        db.add(monthly_record)
+
+    # Upsert daily revenue
+    date_str = today.strftime("%Y-%m-%d")
+    daily_record = (
+        db.query(models.DailyRevenue)
+        .filter(
+            models.DailyRevenue.barber_id == appointment.barber_id,
+            models.DailyRevenue.date == date_str,
+        )
+        .first()
+    )
+
+    if daily_record:
+        daily_record.revenue += revenue_amount
+        daily_record.appointments_count += 1
+    else:
+        daily_record = models.DailyRevenue(
+            barber_id=appointment.barber_id,
+            date=date_str,
+            revenue=revenue_amount,
+            appointments_count=1,
+        )
+        db.add(daily_record)
+
+    db.commit()
+    return True
+
+
+def cancel_appointment(db: Session, appointment_id: int):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.id == appointment_id)
+        .first()
+    )
+    if appointment:
+        appointment.status = "cancelled"
+        db.commit()
+        db.refresh(appointment)
+    return appointment
+
+
+def reopen_appointment(db: Session, appointment_id: int):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.id == appointment_id)
+        .first()
+    )
+    if appointment and appointment.status == "completed":
+        appointment.status = "scheduled"
+
+        # Remove from revenue records
+        today = appointment.appointment_time.date()
+
+        # Remove from daily revenue
+        date_str = today.strftime("%Y-%m-%d")
+        daily_record = (
+            db.query(models.DailyRevenue)
+            .filter(
+                models.DailyRevenue.barber_id == appointment.barber_id,
+                models.DailyRevenue.date == date_str,
+            )
+            .first()
+        )
+
+        if daily_record:
+            daily_record.revenue -= (
+                appointment.custom_price or appointment.service.price
+            )
+            daily_record.appointments_count -= 1
+            if daily_record.appointments_count <= 0:
+                db.delete(daily_record)
+
+        # Remove from monthly revenue
+        monthly_record = (
+            db.query(models.MonthlyRevenue)
+            .filter(
+                models.MonthlyRevenue.barber_id == appointment.barber_id,
+                models.MonthlyRevenue.year == today.year,
+                models.MonthlyRevenue.month == today.month,
+            )
+            .first()
+        )
+
+        if monthly_record:
+            monthly_record.revenue -= (
+                appointment.custom_price or appointment.service.price
+            )
+            monthly_record.appointments_count -= 1
+            if monthly_record.appointments_count <= 0:
+                db.delete(monthly_record)
+
+        db.commit()
+        db.refresh(appointment)
+    return appointment
+
+
+def update_appointment_details(
+    db: Session,
+    appointment_id: int,
+    client_name: str,
+    barber_id: int,
+    time: str,
+    price: float,
+    duration: int,
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.id == appointment_id)
+        .first()
+    )
+    if not appointment:
+        raise ValueError("Appointment not found")
+
+    # Update time (keep same date, change time)
+    current_date = appointment.appointment_time.date()
+    new_time = datetime.strptime(time, "%H:%M").time()
+    new_datetime = datetime.combine(current_date, new_time)
+
+    # Quick update without extensive validation (admin override)
+    appointment.client_name = client_name
+    appointment.barber_id = barber_id
+    appointment.appointment_time = new_datetime
+    appointment.custom_price = price
+    appointment.custom_duration = duration
+
+    db.commit()
+    db.refresh(appointment)
+    return appointment
+
+
+def delete_barber(db: Session, barber_id: int):
+    try:
+        # First delete all revenue records for this barber
+        db.query(models.MonthlyRevenue).filter(
+            models.MonthlyRevenue.barber_id == barber_id
+        ).delete()
+        db.query(models.DailyRevenue).filter(
+            models.DailyRevenue.barber_id == barber_id
+        ).delete()
+
+        # Then delete all appointments for this barber
+        db.query(models.Appointment).filter(
+            models.Appointment.barber_id == barber_id
+        ).delete()
+
+        # Finally delete the barber
+        barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+        if barber:
+            db.delete(barber)
+            db.commit()
+        return barber
+    except Exception as e:
+        db.rollback()
+        print(f"Error deleting barber: {e}")
+        raise e
+
+
+def toggle_barber_status(db: Session, barber_id: int):
+    barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+    if barber:
+        barber.active = 1 - barber.active  # Toggle between 0 and 1
+        db.commit()
+        db.refresh(barber)
+    return barber
+
+
+def update_barber_name(db: Session, barber_id: int, new_name: str):
+    barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+    if barber:
+        barber.name = new_name
+        db.commit()
+        db.refresh(barber)
+    return barber
+
+
+def get_schedule(db: Session):
+    schedule = db.query(models.Schedule).first()
+    if not schedule:
+        schedule = models.Schedule()
+        db.add(schedule)
+        db.commit()
+        db.refresh(schedule)
+    return schedule
+
+
+def update_schedule(db: Session, start_hour: int, end_hour: int):
+    schedule = get_schedule(db)
+    schedule.start_hour = start_hour
+    schedule.end_hour = end_hour
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+
+def toggle_schedule(db: Session):
+    schedule = get_schedule(db)
+    schedule.is_open = 1 - schedule.is_open  # Toggle between 0 and 1
+    db.commit()
+    db.refresh(schedule)
+    return schedule
+
+
+def cleanup_daily_and_save_revenue(db: Session):
+    today = datetime.now().date()
+
+    # Delete all appointments older than today (revenue already saved live)
+    deleted_count = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.appointment_time < today)
+        .delete()
+    )
+
+    db.commit()
+    return deleted_count
+
+
+def get_monthly_revenue(
+    db: Session, year: int = None, month: int = None, location_id: int = None
+):
+    if not year or not month:
+        today = datetime.now().date()
+        year = today.year
+        month = today.month
+
+    query = db.query(models.MonthlyRevenue).filter(
+        models.MonthlyRevenue.year == year, models.MonthlyRevenue.month == month
+    )
+
+    if location_id:
+        query = query.join(models.Barber).filter(
+            models.Barber.location_id == location_id
+        )
+
+    records = query.all()
+
+    total_revenue = sum(record.revenue for record in records)
+    total_appointments = sum(record.appointments_count for record in records)
+
+    return {
+        "records": records,
+        "total_revenue": total_revenue,
+        "total_appointments": total_appointments,
+    }
+
+
+def get_daily_revenue(db: Session, date: str = None, location_id: int = None):
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+
+    query = db.query(models.DailyRevenue).filter(models.DailyRevenue.date == date)
+
+    if location_id:
+        query = query.join(models.Barber).filter(
+            models.Barber.location_id == location_id
+        )
+
+    records = query.all()
+
+    total_revenue = sum(record.revenue for record in records)
+    total_appointments = sum(record.appointments_count for record in records)
+
+    return {
+        "records": records,
+        "total_revenue": total_revenue,
+        "total_appointments": total_appointments,
+        "date": date,
+    }
+
+
+def get_barber_with_least_appointments(
+    db: Session, service_id: int, appointment_time: str, location_id: int = None
+):
+    """Find active barber with least appointments for the day (excludes Luca and Raffa from random)"""
+    appointment_dt = datetime.fromisoformat(appointment_time)
+    today = appointment_dt.date()
+
+    if location_id:
+        active_barbers = get_active_barbers_by_location(db, location_id)
+    else:
+        active_barbers = get_active_barbers(db)
+
+    # Exclude Luca and Raffa from random selection
+    excluded_names = ["Luca", "Raffa"]
+    eligible_barbers = [b for b in active_barbers if b.name not in excluded_names]
+
+    barber_counts = []
+
+    for barber in eligible_barbers:
+        # Count today's appointments for this barber
+        count = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.barber_id == barber.id,
+                models.Appointment.appointment_time >= today,
+                models.Appointment.appointment_time < today + timedelta(days=1),
+                models.Appointment.status != "cancelled",
+            )
+            .count()
+        )
+
+        # Check if this barber has availability for the requested time
+        available_times = get_available_times_for_service(db, barber.id, service_id)
+        requested_time = appointment_dt.strftime("%H:%M")
+
+        if requested_time in available_times:
+            barber_counts.append((barber.id, count))
+
+    if not barber_counts:
+        return None
+
+    # Return barber with least appointments
+    return min(barber_counts, key=lambda x: x[1])[0]
+
+
+def get_weekly_revenue(db: Session, date: str = None, location_id: int = None):
+    if not date:
+        date = datetime.now().strftime("%Y-%m-%d")
+
+    # Get start of week (Monday)
+    selected_date = datetime.strptime(date, "%Y-%m-%d").date()
+    start_of_week = selected_date - timedelta(days=selected_date.weekday())
+    end_of_week = start_of_week + timedelta(days=6)
+
+    # Get all daily records for the week
+    query = db.query(models.DailyRevenue).filter(
+        models.DailyRevenue.date >= start_of_week.strftime("%Y-%m-%d"),
+        models.DailyRevenue.date <= end_of_week.strftime("%Y-%m-%d"),
+    )
+
+    if location_id:
+        query = query.join(models.Barber).filter(
+            models.Barber.location_id == location_id
+        )
+
+    records = query.all()
+
+    # Group by barber
+    barber_totals = {}
+    for record in records:
+        if record.barber_id not in barber_totals:
+            barber_totals[record.barber_id] = {
+                "barber": record.barber,
+                "revenue": 0,
+                "appointments_count": 0,
+            }
+        barber_totals[record.barber_id]["revenue"] += record.revenue
+        barber_totals[record.barber_id][
+            "appointments_count"
+        ] += record.appointments_count
+
+    weekly_records = list(barber_totals.values())
+    total_revenue = sum(r["revenue"] for r in weekly_records)
+    total_appointments = sum(r["appointments_count"] for r in weekly_records)
+
+    return {
+        "records": weekly_records,
+        "total_revenue": total_revenue,
+        "total_appointments": total_appointments,
+        "week_start": start_of_week.strftime("%Y-%m-%d"),
+        "week_end": end_of_week.strftime("%Y-%m-%d"),
+    }
