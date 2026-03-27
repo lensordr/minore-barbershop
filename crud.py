@@ -474,35 +474,31 @@ def get_available_times_for_service(
     service_id: int,
     is_vip: bool = False,
     use_tomorrow: bool = False,
+    schedule=None,
 ):
-    """
-    Get available time slots for a service
-
-    VIP CODE RULES:
-    - VIP code allows booking 24 hours in advance (tomorrow from 12 PM)
-    - VIP code also allows booking TODAY but only slots AFTER 12 PM (noon)
-    - Regular users: can only book today from 11 AM onwards
-    """
     now = datetime.now()
     today = now.date()
 
-    schedule = get_schedule(db)
+    # Accept pre-fetched schedule to avoid repeated DB calls
+    if schedule is None:
+        schedule = get_schedule(db)
 
-    # Check if schedule is closed (master toggle)
     if not schedule.is_open:
-        return []  # No times available when schedule is closed
-
-    # Get service duration
-    service = db.query(models.Service).filter(models.Service.id == service_id).first()
-    if not service:
         return []
 
-    service_duration = service.duration
+    # Get service duration in a single targeted query
+    service_duration = (
+        db.query(models.Service.duration)
+        .filter(models.Service.id == service_id)
+        .scalar()
+    )
+    if not service_duration:
+        return []
 
     # VIP users booking for tomorrow (24h advance)
     if is_vip and use_tomorrow:
         tomorrow = today + timedelta(days=1)
-        if tomorrow.weekday() == 6:  # Skip Sunday
+        if tomorrow.weekday() == 6:
             return []
         start_time = datetime.combine(
             tomorrow, datetime.min.time().replace(hour=schedule.start_hour)
@@ -510,21 +506,14 @@ def get_available_times_for_service(
         end_time = datetime.combine(
             tomorrow, datetime.min.time().replace(hour=schedule.end_hour)
         )
-        # VIP 24h advance: earliest slot is 12 PM (noon)
         earliest_time = datetime.combine(
             tomorrow, datetime.min.time().replace(hour=12, minute=0)
         )
-    # Regular users or VIP booking for today
     else:
-        # Block Sunday bookings
         if today.weekday() == 6:
             return []
-
         if now.hour >= schedule.end_hour:
-            # After hours - no slots available
             return []
-
-        # Regular users cannot access booking before 11 AM
         if not is_vip and now.hour < schedule.start_hour:
             return []
 
@@ -535,18 +524,11 @@ def get_available_times_for_service(
             today, datetime.min.time().replace(hour=schedule.end_hour)
         )
 
-        # Calculate next available slot based on current time
-        current_hour = now.hour
-        current_minute = now.minute
-
-        if current_minute < 30:
-            next_hour = current_hour
-            next_minute = 30
+        if now.minute < 30:
+            next_hour, next_minute = now.hour, 30
         else:
-            next_hour = current_hour + 1
-            next_minute = 0
+            next_hour, next_minute = now.hour + 1, 0
 
-        # If we're before business hours, start from business hours
         if next_hour < schedule.start_hour:
             earliest_time = start_time
         else:
@@ -554,24 +536,21 @@ def get_available_times_for_service(
                 today, datetime.min.time().replace(hour=next_hour, minute=next_minute)
             )
 
-        # Time restrictions based on user type:
-        # - Regular users: cannot book before 11 AM
-        # - VIP users: cannot book before 12 PM (noon)
-        if is_vip:
-            min_booking_time = datetime.combine(
-                today, datetime.min.time().replace(hour=12, minute=0)
-            )
-        else:
-            min_booking_time = datetime.combine(
-                today, datetime.min.time().replace(hour=11, minute=0)
-            )
-
+        min_booking_time = datetime.combine(
+            today,
+            datetime.min.time().replace(hour=12 if is_vip else 11, minute=0),
+        )
         if earliest_time < min_booking_time:
             earliest_time = min_booking_time
 
-    # Get existing appointments for this barber on target day (exclude cancelled)
+    # Single query — only fetch the columns needed, no lazy loads
     existing_appointments = (
-        db.query(models.Appointment)
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Service.duration,
+        )
+        .join(models.Service)
         .filter(
             models.Appointment.barber_id == barber_id,
             models.Appointment.appointment_time >= start_time,
@@ -581,35 +560,22 @@ def get_available_times_for_service(
         .all()
     )
 
-    # Generate available slots (every 30 minutes)
+    # Pre-compute booked intervals once
+    booked = [
+        (apt_time, apt_time + timedelta(minutes=custom_dur or svc_dur))
+        for apt_time, custom_dur, svc_dur in existing_appointments
+    ]
+
     available_times = []
     current = start_time
     while current < end_time:
         if current >= earliest_time:
-            # Check if service would fit before closing time
             service_end = current + timedelta(minutes=service_duration)
             if service_end <= end_time:
-                # Check for conflicts with existing appointments
-                has_conflict = False
-                for existing in existing_appointments:
-                    existing_duration = (
-                        existing.custom_duration or existing.service.duration
-                    )
-                    existing_end = existing.appointment_time + timedelta(
-                        minutes=existing_duration
-                    )
-
-                    # Check if appointments would overlap
-                    if (
-                        current < existing_end
-                        and service_end > existing.appointment_time
-                    ):
-                        has_conflict = True
-                        break
-
-                if not has_conflict:
+                if not any(
+                    current < end and service_end > start for start, end in booked
+                ):
                     available_times.append(current.strftime("%H:%M"))
-
         current += timedelta(minutes=30)
 
     return available_times

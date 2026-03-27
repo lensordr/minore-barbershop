@@ -189,94 +189,51 @@ function updateAvailableTimes() {
     const timeSelect = document.getElementById('appointment_time');
     const dateSelector = document.getElementById('appointment_date');
     const dateSelection = dateSelector ? dateSelector.value : 'today';
-    
-    if (barberId && serviceId) {
-        timeSelect.innerHTML = '<option value="">Loading times...</option>';
-        timeSelect.disabled = true;
-        
-        if (barberId === 'random') {
-            // For random selection, get all available times from all barbers
-            const barberItems = document.querySelectorAll('.barber-item[data-barber-id]:not([data-barber-id="random"])');
-            if (barberItems.length === 0) return;
-            
-            const allTimes = new Set();
-            let completedRequests = 0;
-            
-            barberItems.forEach(item => {
-                const barberId = item.getAttribute('data-barber-id');
-                fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSelection}&t=${Date.now()}`)
-                    .then(response => response.json())
-                    .then(times => {
-                        times.forEach(time => allTimes.add(time));
-                        completedRequests++;
-                        
-                        if (completedRequests === barberItems.length) {
-                            // All requests completed, show all available times
-                            timeSelect.innerHTML = '<option value="">Select a time</option>';
-                            const now = new Date();
-                            const currentHour = now.getHours();
-                            const currentMinute = now.getMinutes();
-                            
-                            Array.from(allTimes).sort().forEach(time => {
-                                const [hour, minute] = time.split(':').map(Number);
-                                const timeInMinutes = hour * 60 + minute;
-                                const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                                
-                                // Get selected date (today or tomorrow)
-                                const dateSelector = document.getElementById('appointment_date');
-                                let targetDate = new Date();
-                                if (dateSelector && dateSelector.value === 'tomorrow') {
-                                    targetDate.setDate(targetDate.getDate() + 1);
-                                }
-                                const dateStr = targetDate.toISOString().split('T')[0];
-                                const datetime = `${dateStr}T${time}:00`;
-                                timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
-                            });
-                            timeSelect.disabled = false;
-                        }
-                    })
-                    .catch(error => {
-                        completedRequests++;
-                        if (completedRequests === barberItems.length) {
-                            timeSelect.innerHTML = '<option value="">Error loading times</option>';
-                            timeSelect.disabled = false;
-                        }
-                    });
-            });
-        } else {
-            fetch(`/api/available-times/${barberId}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSelection}&t=${Date.now()}`)
-                .then(response => response.json())
-                .then(times => {
-                    timeSelect.innerHTML = '<option value="">Select a time</option>';
-                    const now = new Date();
-                    const currentHour = now.getHours();
-                    const currentMinute = now.getMinutes();
-                    
-                    times.forEach(time => {
-                        const [hour, minute] = time.split(':').map(Number);
-                        const timeInMinutes = hour * 60 + minute;
-                        const currentTimeInMinutes = currentHour * 60 + currentMinute;
-                        
-                        // Get selected date (today or tomorrow)
-                        const dateSelector = document.getElementById('appointment_date');
-                        let targetDate = new Date();
-                        if (dateSelector && dateSelector.value === 'tomorrow') {
-                            targetDate.setDate(targetDate.getDate() + 1);
-                        }
-                        const dateStr = targetDate.toISOString().split('T')[0];
-                        const datetime = `${dateStr}T${time}:00`;
-                        timeSelect.innerHTML += `<option value="${datetime}">${time}</option>`;
-                    });
-                    timeSelect.disabled = false;
-                })
-                .catch(error => {
-                    timeSelect.innerHTML = '<option value="">Error loading times</option>';
-                    timeSelect.disabled = false;
-                });
-        }
-    } else {
+
+    if (!barberId || !serviceId) {
         timeSelect.innerHTML = '<option value="">Select service and barber first</option>';
         timeSelect.disabled = true;
+        return;
+    }
+
+    timeSelect.innerHTML = '<option value="">Loading times...</option>';
+    timeSelect.disabled = true;
+
+    const targetDate = new Date();
+    if (dateSelection === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
+    const dateStr = targetDate.toISOString().split('T')[0];
+
+    const fetchTimes = (bid) =>
+        fetch(`/api/available-times/${bid}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSelection}&t=${Date.now()}`)
+            .then(r => r.json())
+            .catch(() => []);
+
+    if (barberId === 'random') {
+        const barberItems = document.querySelectorAll('.barber-item[data-barber-id]:not([data-barber-id="random"])');
+        if (barberItems.length === 0) return;
+
+        // Fetch all barbers in parallel
+        Promise.all(Array.from(barberItems).map(item => fetchTimes(item.getAttribute('data-barber-id'))))
+            .then(results => {
+                const allTimes = [...new Set(results.flat())].sort();
+                timeSelect.innerHTML = allTimes.length
+                    ? '<option value="">Select a time</option>'
+                    : '<option value="">No times available</option>';
+                allTimes.forEach(time => {
+                    timeSelect.innerHTML += `<option value="${dateStr}T${time}:00">${time}</option>`;
+                });
+                timeSelect.disabled = false;
+            });
+    } else {
+        fetchTimes(barberId).then(times => {
+            timeSelect.innerHTML = times.length
+                ? '<option value="">Select a time</option>'
+                : '<option value="">No times available</option>';
+            times.forEach(time => {
+                timeSelect.innerHTML += `<option value="${dateStr}T${time}:00">${time}</option>`;
+            });
+            timeSelect.disabled = false;
+        });
     }
 }
 

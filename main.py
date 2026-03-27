@@ -1234,8 +1234,10 @@ async def get_available_times(
 
     # Get available times with VIP flag and date selection
     use_tomorrow = date_selection == "tomorrow" and is_vip
+    # Fetch schedule once here so get_available_times_for_service doesn't re-query it
+    schedule = crud.get_schedule(db)
     times = crud.get_available_times_for_service(
-        db, barber_id, service_id, is_vip, use_tomorrow
+        db, barber_id, service_id, is_vip, use_tomorrow, schedule
     )
     return JSONResponse(
         content=times,
