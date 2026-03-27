@@ -1,0 +1,1485 @@
+from fastapi import FastAPI, Request, Depends, HTTPException, Form, Cookie
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, RedirectResponse
+from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+import models
+import crud
+import os
+from database_postgres import get_db
+from email_service import send_appointment_email, send_cancellation_email
+import uvicorn
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from sse_starlette.sse import EventSourceResponse
+from contextlib import asynccontextmanager
+import time
+
+# Initialize Sentry error monitoring
+try:
+    from sentry_config import init_sentry
+
+    init_sentry()
+except Exception as e:
+    print(f"⚠️  Sentry initialization failed: {e}")
+
+
+def check_admin_auth(request: Request, admin_logged_in: str = Cookie(None)):
+    if admin_logged_in != "true":
+        return RedirectResponse(url="/admin/login", status_code=303)
+    return True
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    scheduler.start()
+    print("MINORE BARBER - Ready for appointments! v2")
+    yield
+    # Shutdown
+    try:
+        scheduler.shutdown(wait=False)
+    except Exception as e:
+        print(f"Scheduler shutdown error (ignored): {e}")
+
+
+app = FastAPI(title="MINORE BARBER", lifespan=lifespan)
+
+# Register global error handlers
+try:
+    from error_handlers import register_error_handlers
+
+    register_error_handlers(app)
+except Exception as e:
+    print(f"⚠️  Error handler registration failed: {e}")
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+# Simple refresh flag
+last_booking_time = 0
+
+# Auto-refresh disabled
+
+# Tables created manually - no auto-creation to preserve data
+
+# Keep-alive scheduler - disabled for local development
+scheduler = AsyncIOScheduler()
+
+if os.environ.get("RENDER_EXTERNAL_URL"):
+    from daily_revenue_email import send_daily_revenue_email
+
+    scheduler.add_job(
+        send_daily_revenue_email, "cron", hour=9, minute=0, id="daily_revenue"
+    )
+
+
+def check_business_hours():
+    # Temporarily disabled for testing
+    return True
+    # from datetime import timezone, timedelta
+    # cet = timezone(timedelta(hours=1))
+    # current_time = datetime.now(cet)
+    # return 10 <= current_time.hour < 22
+
+
+@app.get("/", response_class=HTMLResponse)
+@app.head("/")
+async def home(request: Request):
+    if not check_business_hours():
+        return HTMLResponse(
+            "<h1>MINORE BARBERSHOP</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>"
+        )
+    return RedirectResponse(url="/client/login", status_code=303)
+
+
+@app.get("/locations", response_class=HTMLResponse)
+async def location_selector(request: Request):
+    return templates.TemplateResponse("location_selector.html", {"request": request})
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return RedirectResponse(url="/static/favicon.ico", status_code=301)
+
+
+@app.get("/photos/{location}/{filename}")
+async def photos(location: str, filename: str):
+    return RedirectResponse(
+        url=f"/static/photos/{location}/{filename}", status_code=301
+    )
+
+
+@app.get("/mallorca/book", response_class=HTMLResponse)
+async def book_appointment_mallorca(
+    request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)
+):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    if not check_business_hours():
+        return HTMLResponse(
+            "<h1>MINORE BARBERSHOP - MALLORCA</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>"
+        )
+
+    schedule = crud.get_schedule(db)
+    if not schedule.is_open:
+        return HTMLResponse(
+            "<h1>MINORE BARBERSHOP - MALLORCA</h1><p>We are temporarily closed. Please check back later.</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>"
+        )
+
+    return RedirectResponse(url="/client/book/mallorca", status_code=303)
+
+
+@app.get("/client/login", response_class=HTMLResponse)
+async def client_login(request: Request):
+    return templates.TemplateResponse("client_login.html", {"request": request})
+
+
+@app.post("/client/login")
+async def client_login_post(
+    request: Request,
+    phone: str = Form(...),
+    name: str = Form(""),
+    email: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    if not phone or phone.strip() == "":
+        return templates.TemplateResponse(
+            "client_login.html",
+            {"request": request, "error": "Phone number is required"},
+        )
+
+    phone = phone.strip()
+
+    # Check if client exists
+    existing_client = crud.get_client_by_phone(db, phone)
+
+    if existing_client:
+        # Check if client is blocked
+        if existing_client.blocked:
+            return templates.TemplateResponse(
+                "client_blocked.html", {"request": request, "client": existing_client}
+            )
+
+        # Client exists - go to location selector
+        response = RedirectResponse(url="/locations", status_code=303)
+        response.set_cookie("client_phone", existing_client.phone, max_age=86400 * 30)
+        return response
+    else:
+        # New client - name is required
+        if not name or name.strip() == "":
+            return templates.TemplateResponse(
+                "client_login.html",
+                {
+                    "request": request,
+                    "error": "Name is required for new accounts",
+                    "phone": phone,
+                    "email": email,
+                    "show_name_field": True,
+                },
+            )
+
+        # Create new client
+        client = crud.get_or_create_client(db, phone, name.strip(), email.strip())
+        response = RedirectResponse(url="/locations", status_code=303)
+        response.set_cookie("client_phone", client.phone, max_age=86400 * 30)
+        return response
+
+
+@app.get("/concell/book", response_class=HTMLResponse)
+async def book_appointment_concell(
+    request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)
+):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    if not check_business_hours():
+        return HTMLResponse(
+            "<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>"
+        )
+
+    schedule = crud.get_schedule(db)
+    if not schedule.is_open:
+        return HTMLResponse(
+            "<h1>MINORE BARBERSHOP - CONCELL</h1><p>We are temporarily closed. Please check back later.</p><style>body{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}</style>"
+        )
+
+    return RedirectResponse(url="/client/book/concell", status_code=303)
+
+
+@app.get("/client/book/{location}", response_class=HTMLResponse)
+async def client_book_location(
+    request: Request,
+    location: str,
+    vip_code: str = "",
+    client_phone: str = Cookie(None),
+    db: Session = Depends(get_db),
+):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    # Check if client is blocked
+    if client.blocked:
+        return templates.TemplateResponse(
+            "client_blocked.html", {"request": request, "client": client}
+        )
+
+    if not check_business_hours():
+        location_name = location.title()
+        return HTMLResponse(
+            f"<h1>MINORE BARBERSHOP - {location_name.upper()}</h1><p>We are closed. Open 11:00 - 20:00</p><style>body{{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}}</style>"
+        )
+
+    schedule = crud.get_schedule(db)
+    if not schedule.is_open:
+        location_name = location.title()
+        return HTMLResponse(
+            f"<h1>MINORE BARBERSHOP - {location_name.upper()}</h1><p>We are temporarily closed. Please check back later.</p><style>body{{font-family:Arial;text-align:center;padding:50px;background:#1d1a1c;color:#fbcc93;}}</style>"
+        )
+
+    location_id = 1 if location.lower() == "mallorca" else 2
+    location_name = "Mallorca" if location_id == 1 else "Concell"
+
+    services = crud.get_services_by_location(db, location_id)
+
+    # Filter barbers by VIP code if provided
+    vip_barber = None
+    vip_error = None
+    if vip_code and vip_code.strip():
+        vip_code_upper = vip_code.strip().upper()
+        if vip_code_upper.startswith("VIP"):
+            barber_name = vip_code_upper[3:]  # Remove "VIP" prefix
+            # Search ALL barbers (including inactive) for this location
+            all_location_barbers = crud.get_all_barbers_by_location(db, location_id)
+            matched = next(
+                (b for b in all_location_barbers if b.name.upper() == barber_name),
+                None,
+            )
+            if not matched:
+                vip_error = f"VIP code '{vip_code.upper()}' is not valid."
+            elif not matched.early_access_enabled:
+                vip_error = f"{matched.name} does not have VIP early access enabled."
+            elif not matched.active:
+                vip_error = f"{matched.name} is not available today. Please try again later or book without a VIP code after 11:00 AM."
+            else:
+                vip_barber = matched
+
+        if vip_error:
+            # Show error — render page with no barbers so nothing can be booked
+            return templates.TemplateResponse(
+                "booking.html",
+                {
+                    "request": request,
+                    "services": services,
+                    "barbers": [],
+                    "location": location_name,
+                    "location_id": location_id,
+                    "client": client,
+                    "vip_code": vip_code,
+                    "vip_barber": None,
+                    "show_random": False,
+                    "error": vip_error,
+                },
+            )
+
+    if vip_barber:
+        barbers = [vip_barber]
+    else:
+        barbers = crud.get_active_barbers_by_location(db, location_id)
+
+    return templates.TemplateResponse(
+        "booking.html",
+        {
+            "request": request,
+            "services": services,
+            "barbers": barbers,
+            "location": location_name,
+            "location_id": location_id,
+            "client": client,
+            "vip_code": vip_code,
+            "vip_barber": vip_barber,
+            "show_random": not vip_barber,  # No random when VIP barber is selected
+        },
+    )
+
+
+@app.get("/client/dashboard", response_class=HTMLResponse)
+async def client_dashboard(
+    request: Request, client_phone: str = Cookie(None), db: Session = Depends(get_db)
+):
+    if not client_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    # Check if client is blocked
+    if client.blocked:
+        return templates.TemplateResponse(
+            "client_blocked.html", {"request": request, "client": client}
+        )
+
+    # Get client appointments
+    appointments = crud.get_client_appointments(db, client.id)
+
+    # Separate upcoming and past appointments
+    now = datetime.now()
+    upcoming_appointments = [
+        apt
+        for apt in appointments
+        if apt.appointment_time >= now and apt.status == "scheduled"
+    ]
+    past_appointments = [
+        apt
+        for apt in appointments
+        if apt.appointment_time < now or apt.status != "scheduled"
+    ]
+
+    # Determine location based on appointments or default to Mallorca
+    location = "Mallorca"
+    if appointments:
+        # Get location from most recent appointment's barber
+        recent_apt = appointments[0]
+        if recent_apt.barber.location_id == 2:
+            location = "Concell"
+
+    return templates.TemplateResponse(
+        "client_dashboard.html",
+        {
+            "request": request,
+            "client": client,
+            "upcoming_appointments": upcoming_appointments,
+            "past_appointments": past_appointments,
+            "location": location,
+        },
+    )
+
+
+@app.post("/client/cancel-appointment/{appointment_id}")
+async def client_cancel_appointment(
+    appointment_id: int, client_phone: str = Cookie(None), db: Session = Depends(get_db)
+):
+    if not client_phone:
+        return {"success": False, "message": "Not logged in"}
+
+    client = crud.get_client_by_phone(db, client_phone)
+    if not client:
+        return {"success": False, "message": "Client not found"}
+
+    # Verify appointment belongs to client
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.id == appointment_id,
+            models.Appointment.client_id == client.id,
+            models.Appointment.status == "scheduled",
+        )
+        .first()
+    )
+
+    if not appointment:
+        return {"success": False, "message": "Appointment not found"}
+
+    # Cancel appointment
+    appointment.status = "cancelled"
+    db.commit()
+
+    # Trigger admin dashboard refresh
+    global last_booking_time
+    import time
+
+    last_booking_time = time.time()
+    print(
+        f"Client cancelled appointment! Updated last_booking_time to {last_booking_time}"
+    )
+
+    return {"success": True, "message": "Appointment cancelled successfully"}
+
+
+@app.get("/client/logout")
+async def client_logout():
+    response = RedirectResponse(url="/locations", status_code=303)
+    response.delete_cookie("client_phone")
+    return response
+
+
+@app.post("/client/book/{location}")
+async def client_book_appointment(
+    request: Request,
+    location: str,
+    client_name: str = Form(...),
+    client_email: str = Form(""),
+    client_phone: str = Form(...),
+    service_id: int = Form(...),
+    barber_id: str = Form(None),
+    appointment_time: str = Form(None),
+    vip_code: str = Form(""),
+    client_phone_cookie: str = Cookie(None, alias="client_phone"),
+    db: Session = Depends(get_db),
+):
+    if not barber_id or not appointment_time:
+        services = crud.get_services_by_location(
+            db, 1 if location.lower() == "mallorca" else 2
+        )
+        barbers = crud.get_active_barbers_by_location(
+            db, 1 if location.lower() == "mallorca" else 2
+        )
+        location_name = "Mallorca" if location.lower() == "mallorca" else "Concell"
+        return templates.TemplateResponse(
+            "booking.html",
+            {
+                "request": request,
+                "services": services,
+                "barbers": barbers,
+                "location": location_name,
+                "location_id": 1 if location.lower() == "mallorca" else 2,
+                "error": "Please select a barber and time slot.",
+            },
+        )
+    location_id = 1 if location.lower() == "mallorca" else 2
+    return await create_appointment_helper(
+        request,
+        client_name,
+        client_email,
+        client_phone,
+        service_id,
+        barber_id,
+        appointment_time,
+        location_id,
+        vip_code,
+        db,
+    )
+
+
+async def book_appointment_redirect(request: Request, db: Session = Depends(get_db)):
+    default_location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    if default_location == 1:
+        return RedirectResponse(url="/mallorca/book", status_code=303)
+    else:
+        return RedirectResponse(url="/concell/book", status_code=303)
+
+
+@app.post("/mallorca/book")
+async def create_appointment_mallorca(
+    request: Request,
+    client_name: str = Form(...),
+    client_email: str = Form(""),
+    client_phone: str = Form(...),
+    service_id: int = Form(...),
+    barber_id: str = Form(...),
+    appointment_time: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    return await create_appointment_helper(
+        request,
+        client_name,
+        client_email,
+        client_phone,
+        service_id,
+        barber_id,
+        appointment_time,
+        1,
+        db,
+    )
+
+
+@app.post("/concell/book")
+async def create_appointment_concell(
+    request: Request,
+    client_name: str = Form(...),
+    client_email: str = Form(""),
+    client_phone: str = Form(...),
+    service_id: int = Form(...),
+    barber_id: str = Form(...),
+    appointment_time: str = Form(...),
+    db: Session = Depends(get_db),
+):
+    return await create_appointment_helper(
+        request,
+        client_name,
+        client_email,
+        client_phone,
+        service_id,
+        barber_id,
+        appointment_time,
+        2,
+        db,
+    )
+
+
+async def create_appointment_helper(
+    request: Request,
+    client_name: str,
+    client_email: str,
+    client_phone: str,
+    service_id: int,
+    barber_id: str,
+    appointment_time: str,
+    location_id: int,
+    vip_code: str,
+    db: Session,
+):
+    try:
+        # Handle random barber selection
+        if barber_id == "random":
+            actual_barber_id = crud.get_barber_with_least_appointments(
+                db, service_id, appointment_time, location_id
+            )
+            if not actual_barber_id:
+                raise ValueError("No available barbers for this time slot")
+        else:
+            actual_barber_id = int(barber_id)
+
+        # Check VIP code and get extra price
+        vip_extra_price = 0
+        is_vip_appointment = False
+        if vip_code and vip_code.strip():
+            barber = crud.get_barber_by_id(db, actual_barber_id)
+            if barber and barber.early_access_enabled:
+                vip_extra_price = barber.early_access_price_add
+                is_vip_appointment = True
+
+        appointment = crud.create_appointment(
+            db,
+            client_name,
+            client_email,
+            client_phone,
+            service_id,
+            actual_barber_id,
+            appointment_time,
+            vip_extra_price,
+            is_vip_appointment,
+            location_id,
+        )
+        # Mark as random appointment if it was randomly assigned
+        if barber_id == "random":
+            appointment.is_random = 1
+            db.commit()
+
+        print(
+            f"✅ Online appointment created: ID={appointment.id}, Name={client_name}, Barber={actual_barber_id}, Time={appointment_time}, VIP_extra=€{vip_extra_price}, is_online={appointment.is_online}"
+        )
+        # Send email only if provided
+        if client_email and client_email.strip():
+            service = crud.get_service_by_id(db, service_id)
+            barber = crud.get_barber_by_id(db, actual_barber_id)
+
+            import threading
+
+            def send_email_async():
+                try:
+                    print(f"Sending confirmation email to: {client_email}")
+                    location_name = "Mallorca" if location_id == 1 else "Concell"
+                    success = send_appointment_email(
+                        client_email,
+                        client_name,
+                        service.name,
+                        barber.name,
+                        appointment.appointment_time,
+                        appointment.cancel_token,
+                        location_name,
+                    )
+                    print(f"Email result: {success}")
+                except Exception as e:
+                    print(f"Email error: {e}")
+
+            threading.Thread(target=send_email_async, daemon=True).start()
+        else:
+            print("No email provided - appointment created without email notification")
+
+        # Trigger instant dashboard refresh
+        global last_booking_time
+        import time
+
+        last_booking_time = time.time()
+        print(f"📢 Broadcasting new appointment: {client_name} at {appointment_time}")
+
+        # Broadcast real-time update to admin dashboards
+        try:
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            loop.create_task(
+                broadcast_update(
+                    "new_appointment",
+                    {"client_name": client_name, "time": appointment_time},
+                )
+            )
+        except Exception as e:
+            print(f"Broadcast failed: {e}")
+        # Redirect with email parameter
+        email_param = "true" if client_email and client_email.strip() else "false"
+        location_path = "mallorca" if location_id == 1 else "concell"
+        return RedirectResponse(
+            url=f"/{location_path}/success?email={email_param}", status_code=303
+        )
+    except ValueError:
+        services = crud.get_services_by_location(db, location_id)
+        barbers = crud.get_active_barbers_by_location(db, location_id)
+        location_name = "Mallorca" if location_id == 1 else "Concell"
+        return templates.TemplateResponse(
+            "booking.html",
+            {
+                "request": request,
+                "services": services,
+                "barbers": barbers,
+                "location": location_name,
+                "location_id": location_id,
+                "error": "Time slot already booked! Please select another time.",
+            },
+        )
+
+
+@app.get("/mallorca/success", response_class=HTMLResponse)
+async def success_mallorca(request: Request):
+    return templates.TemplateResponse(
+        "success.html", {"request": request, "location": "Mallorca"}
+    )
+
+
+@app.get("/concell/success", response_class=HTMLResponse)
+async def success_concell(request: Request):
+    return templates.TemplateResponse(
+        "success.html", {"request": request, "location": "Concell"}
+    )
+
+
+@app.get("/success", response_class=HTMLResponse)
+async def success_redirect(request: Request):
+    return RedirectResponse(url="/locations", status_code=303)
+
+
+@app.get("/admin/login", response_class=HTMLResponse)
+async def admin_login(request: Request):
+    return templates.TemplateResponse("admin_login.html", {"request": request})
+
+
+@app.post("/admin/login")
+async def admin_login_post(username: str = Form(...), password: str = Form(...)):
+    valid_user = os.environ.get("ADMIN_USERNAME", "admin")
+    valid_pass = os.environ.get("ADMIN_PASSWORD", "minore123")
+    if username == valid_user and password == valid_pass:
+        response = RedirectResponse(url="/admin/dashboard", status_code=303)
+        response.set_cookie("admin_logged_in", "true")
+        return response
+    raise HTTPException(status_code=401, detail="Invalid credentials")
+
+
+@app.get("/admin/dashboard", response_class=HTMLResponse)
+async def admin_dashboard(
+    request: Request,
+    location: int = None,
+    date: str = None,
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+
+    # Determine which date to show
+    if date == "tomorrow":
+        target_date = datetime.now().date() + timedelta(days=1)
+    else:
+        target_date = datetime.now().date()
+
+    print(
+        f"Dashboard accessed at {datetime.now()} for location {location}, date {target_date}"
+    )
+    appointments = crud.get_appointments_by_date_and_location(db, target_date, location)
+    barbers = crud.get_barbers_with_revenue_by_location(db, location)
+    services = crud.get_services_by_location(db, location)
+    schedule = crud.get_schedule(db)
+    counts = crud.get_appointment_counts_by_date_and_location(db, target_date, location)
+
+    # Create grid data with appointment spans
+    from grid_helper import create_appointment_grid
+
+    grid_data = create_appointment_grid(db, appointments, schedule, location)
+
+    location_name = "Mallorca" if location == 1 else "Concell"
+
+    active_barbers = crud.get_active_barbers_by_location(db, location)
+
+    return templates.TemplateResponse(
+        "admin_dashboard.html",
+        {
+            "request": request,
+            "appointments": appointments,
+            "barbers": active_barbers,
+            "all_barbers": barbers,
+            "services": services,
+            "schedule": schedule,
+            "counts": counts,
+            "grid_data": grid_data,
+            "now": datetime.now(),
+            "location": location_name,
+            "location_id": location,
+        },
+    )
+
+
+@app.get("/admin/clients", response_class=HTMLResponse)
+async def clients_management(
+    request: Request,
+    phone: str = None,
+    location: int = None,
+    db: Session = Depends(get_db),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+
+    clients = crud.get_all_clients(db, phone)
+    location_name = "Mallorca" if location == 1 else "Concell"
+
+    return templates.TemplateResponse(
+        "clients_management.html",
+        {
+            "request": request,
+            "clients": clients,
+            "location": location_name,
+            "location_id": location,
+            "phone_filter": phone or "",
+        },
+    )
+
+
+@app.post("/admin/toggle-client/{client_id}")
+async def toggle_client_block(
+    client_id: int, location: int = Form(None), db: Session = Depends(get_db)
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.toggle_client_block(db, client_id)
+    return RedirectResponse(url=f"/admin/clients?location={location}", status_code=303)
+
+
+@app.get("/admin/staff", response_class=HTMLResponse)
+async def staff_management(
+    request: Request, location: int = None, db: Session = Depends(get_db)
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+
+    barbers = crud.get_barbers_with_revenue_by_location(db, location)
+    services = crud.get_services_by_location(db, location)
+    schedule = crud.get_schedule(db)
+    location_name = "Mallorca" if location == 1 else "Concell"
+
+    return templates.TemplateResponse(
+        "staff_management.html",
+        {
+            "request": request,
+            "barbers": barbers,
+            "services": services,
+            "schedule": schedule,
+            "location": location_name,
+            "location_id": location,
+        },
+    )
+
+
+@app.post("/admin/update-early-access/{barber_id}")
+async def update_early_access(
+    barber_id: int,
+    enabled: str = Form(None),
+    price_add: float = Form(0),
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+
+    barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+    if barber:
+        barber.early_access_enabled = 1 if enabled else 0
+        barber.early_access_price_add = price_add
+        db.commit()
+
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/add-barber")
+async def add_barber(
+    request: Request,
+    name: str = Form(...),
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.create_barber(db, name, location)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/delete-barber/{barber_id}")
+async def delete_barber(
+    barber_id: int,
+    request: Request,
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.delete_barber(db, barber_id)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/toggle-barber/{barber_id}")
+async def toggle_barber(
+    barber_id: int,
+    request: Request,
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.toggle_barber_status(db, barber_id)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/edit-barber/{barber_id}")
+async def edit_barber(
+    barber_id: int,
+    name: str = Form(...),
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.update_barber_name(db, barber_id, name)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/add-service")
+async def add_service(
+    name: str = Form(...),
+    description: str = Form(...),
+    duration: int = Form(...),
+    price: float = Form(...),
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.create_service(db, name, duration, price, description, location)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/edit-service/{service_id}")
+async def edit_service(
+    service_id: int,
+    name: str = Form(...),
+    description: str = Form(...),
+    duration: int = Form(...),
+    price: float = Form(...),
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.update_service(db, service_id, name, duration, price, description)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/delete-service/{service_id}")
+async def delete_service(
+    service_id: int,
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.delete_service(db, service_id)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/checkout/{appointment_id}")
+async def checkout_appointment(appointment_id: int, db: Session = Depends(get_db)):
+    result = crud.checkout_appointment_ultra_fast(db, appointment_id)
+    if result:
+        return {"success": True}
+    else:
+        return {
+            "success": False,
+            "message": "Appointment not found or already completed",
+        }
+
+
+@app.post("/admin/cancel/{appointment_id}")
+async def cancel_appointment(appointment_id: int, db: Session = Depends(get_db)):
+    crud.cancel_appointment(db, appointment_id)
+    return {"success": True}
+
+
+@app.post("/admin/reopen/{appointment_id}")
+async def reopen_appointment(appointment_id: int, db: Session = Depends(get_db)):
+    crud.reopen_appointment(db, appointment_id)
+    return {"success": True}
+
+
+@app.post("/admin/edit-appointment")
+async def edit_appointment(
+    appointment_id: int = Form(...),
+    client_name: str = Form(None),
+    barber_id: int = Form(None),
+    time: str = Form(None),
+    price: float = Form(None),
+    duration: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    try:
+        appointment = (
+            db.query(models.Appointment)
+            .filter(models.Appointment.id == appointment_id)
+            .first()
+        )
+        if not appointment:
+            return {"success": False, "message": "Appointment not found"}
+
+        # Check for conflicts if barber, time, or duration changed
+        if (barber_id and barber_id != appointment.barber_id) or time or duration:
+            check_barber_id = barber_id if barber_id else appointment.barber_id
+            check_duration = (
+                duration
+                if duration
+                else (appointment.custom_duration or appointment.service.duration)
+            )
+
+            if time:
+                current_date = appointment.appointment_time.date()
+                new_time = datetime.strptime(time, "%H:%M").time()
+                check_appointment_time = datetime.combine(current_date, new_time)
+            else:
+                check_appointment_time = appointment.appointment_time
+
+            appointment_end = check_appointment_time + timedelta(minutes=check_duration)
+
+            # Check for conflicts with other appointments (excluding current one) IN SAME LOCATION
+            conflicts = (
+                db.query(models.Appointment)
+                .filter(
+                    models.Appointment.barber_id == check_barber_id,
+                    models.Appointment.location_id == appointment.location_id,
+                    models.Appointment.status != "cancelled",
+                    models.Appointment.id != appointment_id,
+                )
+                .all()
+            )
+
+            for existing in conflicts:
+                existing_duration = (
+                    existing.custom_duration or existing.service.duration
+                )
+                existing_end = existing.appointment_time + timedelta(
+                    minutes=existing_duration
+                )
+
+                if (
+                    check_appointment_time < existing_end
+                    and appointment_end > existing.appointment_time
+                ):
+                    return {
+                        "success": False,
+                        "message": f"Time conflicts with {existing.client_name} at {existing.appointment_time.strftime('%H:%M')}",
+                    }
+
+        # Log changes before updating
+        changes = []
+        old_barber = appointment.barber.name if appointment.barber else "None"
+        if barber_id and barber_id != appointment.barber_id:
+            new_barber = (
+                db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+            )
+            changes.append(
+                f"Barber: {old_barber} → {new_barber.name if new_barber else 'Unknown'}"
+            )
+        if time:
+            old_time = appointment.appointment_time.strftime("%H:%M")
+            changes.append(f"Time: {old_time} → {time}")
+        if price is not None and price != (
+            appointment.custom_price or appointment.service.price
+        ):
+            old_price = appointment.custom_price or appointment.service.price
+            changes.append(f"Price: €{old_price} → €{price}")
+
+        # Update fields
+        if client_name:
+            appointment.client_name = client_name
+        if barber_id:
+            appointment.barber_id = barber_id
+        if time:
+            current_date = appointment.appointment_time.date()
+            new_time = datetime.strptime(time, "%H:%M").time()
+            appointment.appointment_time = datetime.combine(current_date, new_time)
+        if price is not None:
+            appointment.custom_price = price
+        if duration is not None:
+            appointment.custom_duration = duration
+
+        # Save audit log if there were changes
+        if changes:
+            audit_log = models.AppointmentAuditLog(
+                appointment_id=appointment_id,
+                action="updated",
+                changed_by="admin",
+                changes="; ".join(changes),
+                timestamp=datetime.utcnow(),
+            )
+            db.add(audit_log)
+
+        db.commit()
+        return {"success": True, "message": "Appointment updated successfully"}
+    except Exception as e:
+        db.rollback()
+        print(f"Edit appointment error: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/admin/add-appointment")
+async def add_manual_appointment(
+    client_name: str = Form(...),
+    client_phone: str = Form(""),
+    service_id: int = Form(...),
+    barber_id: int = Form(...),
+    appointment_time: str = Form(...),
+    duration: int = Form(...),
+    price: float = Form(...),
+    location_id: int = Form(1),
+    db: Session = Depends(get_db),
+):
+    try:
+        phone = client_phone.strip() if client_phone else ""
+        final_name = client_name.strip()
+
+        client = None
+        if phone:
+            existing_client = crud.get_client_by_phone(db, phone)
+            if existing_client and existing_client.blocked:
+                return {
+                    "success": False,
+                    "message": "This client is blocked and cannot make appointments",
+                }
+            client = crud.get_or_create_client(db, phone, final_name, "")
+
+        # Create appointment — pass client data directly, no re-fetch needed
+        appointment_id = crud.create_appointment_lightning_fast(
+            db,
+            final_name,
+            service_id,
+            barber_id,
+            appointment_time,
+            duration,
+            price,
+            location_id=location_id,
+            client_id=client.id if client else None,
+            phone=client.phone if client else "",
+            email=client.email if client else "",
+        )
+
+        print(
+            f"✅ Manual appointment created: ID={appointment_id}, Name={final_name}, Phone={phone or 'None'}, Barber={barber_id}, Time={appointment_time}, Location={location_id}"
+        )
+
+        global last_booking_time
+        last_booking_time = time.time()
+
+        return {"success": True, "message": f"Appointment added for {final_name}"}
+    except Exception as e:
+        print(f"Error creating appointment: {e}")
+        return {"success": False, "message": str(e)}
+
+
+@app.post("/admin/update-schedule")
+async def update_schedule(
+    start_hour: int = Form(...),
+    end_hour: int = Form(...),
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.update_schedule(db, start_hour, end_hour)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/toggle-schedule")
+async def toggle_schedule(
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.toggle_schedule(db)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
+@app.post("/admin/cleanup")
+async def cleanup_daily(location: int = Form(None), db: Session = Depends(get_db)):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.cleanup_daily_and_save_revenue(db)
+    return RedirectResponse(
+        url=f"/admin/dashboard?location={location}", status_code=303
+    )
+
+
+@app.get("/admin/revenue", response_class=HTMLResponse)
+async def revenue_reports(
+    request: Request,
+    view: str = "monthly",
+    date: str = None,
+    location: int = None,
+    revenue_logged_in: str = Cookie(None),
+    db: Session = Depends(get_db),
+):
+    # Only ask for password if not logged in AND it's the main revenue access (no view parameter from URL)
+    if revenue_logged_in != "true" and not request.url.query:
+        return templates.TemplateResponse("revenue_login.html", {"request": request})
+
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+
+    if view == "daily":
+        revenue_data = crud.get_daily_revenue(db, date, location)
+        template = "daily_revenue.html"
+    elif view == "weekly":
+        revenue_data = crud.get_weekly_revenue(db, date, location)
+        template = "weekly_revenue.html"
+    else:
+        revenue_data = crud.get_monthly_revenue(db, location_id=location)
+        template = "monthly_revenue.html"
+
+    location_name = "Mallorca" if location == 1 else "Concell"
+
+    return templates.TemplateResponse(
+        template,
+        {
+            "request": request,
+            "revenue_data": revenue_data,
+            "current_view": view,
+            "selected_date": date or datetime.now().strftime("%Y-%m-%d"),
+            "location": location_name,
+            "location_id": location,
+        },
+    )
+
+
+@app.post("/admin/revenue-login")
+async def revenue_login_post(
+    request: Request, password: str = Form(...), db: Session = Depends(get_db)
+):
+    if password == os.environ.get("REVENUE_PASSWORD", "minorebarber2025"):
+        response = RedirectResponse(url="/admin/revenue", status_code=303)
+        response.set_cookie("revenue_logged_in", "true")  # Session-based
+        return response
+    else:
+        return templates.TemplateResponse(
+            "revenue_login.html", {"request": request, "error": "Invalid password"}
+        )
+
+
+@app.get("/admin/revenue-logout")
+async def revenue_logout(request: Request, location: int = None):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    response = RedirectResponse(
+        url=f"/admin/dashboard?location={location}", status_code=303
+    )
+    response.delete_cookie("revenue_logged_in")
+    return response
+
+
+# Excel export temporarily disabled for deployment compatibility
+
+
+@app.get("/admin/logout")
+async def admin_logout():
+    response = RedirectResponse(url="/admin/login", status_code=303)
+    response.delete_cookie("admin_logged_in")
+    return response
+
+
+@app.get("/api/appointment-details/{appointment_id}")
+async def get_appointment_details(appointment_id: int, db: Session = Depends(get_db)):
+    """Get appointment details including phone number"""
+    appointment = (
+        db.query(models.Appointment)
+        .filter(models.Appointment.id == appointment_id)
+        .first()
+    )
+    if appointment:
+        return {
+            "phone": appointment.phone or "",
+            "email": appointment.email or "",
+            "service_id": appointment.service_id,
+        }
+    return {"phone": "", "email": "", "service_id": None}
+
+
+@app.get("/api/check-client")
+async def check_client(phone: str, db: Session = Depends(get_db)):
+    """Check if client exists by phone number"""
+    client = crud.get_client_by_phone(db, phone.strip())
+    if client:
+        return {"exists": True, "name": client.name, "email": client.email}
+    else:
+        return {"exists": False}
+
+
+@app.get("/api/available-times/{barber_id}/{service_id}")
+async def get_available_times(
+    barber_id: int,
+    service_id: int,
+    vip_code: str = "",
+    date_selection: str = "today",
+    db: Session = Depends(get_db),
+):
+    from fastapi.responses import JSONResponse
+
+    # Check if VIP code is valid for this barber
+    is_vip = False
+    if vip_code and vip_code.strip():
+        vip_code_upper = vip_code.strip().upper()
+        if vip_code_upper.startswith("VIP"):
+            barber = crud.get_barber_by_id(db, barber_id)
+            if barber and barber.early_access_enabled:
+                barber_name = vip_code_upper[3:]
+                if barber.name.upper() == barber_name:
+                    is_vip = True
+
+    # Get available times with VIP flag and date selection
+    use_tomorrow = date_selection == "tomorrow" and is_vip
+    # Fetch schedule once here so get_available_times_for_service doesn't re-query it
+    schedule = crud.get_schedule(db)
+    times = crud.get_available_times_for_service(
+        db, barber_id, service_id, is_vip, use_tomorrow, schedule
+    )
+    return JSONResponse(
+        content=times,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
+
+
+@app.get("/cancel-appointment/{cancel_token}")
+async def cancel_appointment_by_token(
+    request: Request, cancel_token: str, db: Session = Depends(get_db)
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.cancel_token == cancel_token,
+            models.Appointment.status == "scheduled",
+        )
+        .first()
+    )
+
+    return templates.TemplateResponse(
+        "cancel_appointment.html",
+        {"request": request, "appointment": appointment, "cancel_token": cancel_token},
+    )
+
+
+@app.post("/cancel-appointment/{cancel_token}/confirm")
+async def confirm_cancel_appointment(
+    request: Request, cancel_token: str, db: Session = Depends(get_db)
+):
+    appointment = (
+        db.query(models.Appointment)
+        .filter(
+            models.Appointment.cancel_token == cancel_token,
+            models.Appointment.status == "scheduled",
+        )
+        .first()
+    )
+
+    if appointment:
+        appointment.status = "cancelled"
+        db.commit()
+
+        # Trigger dashboard refresh
+        global last_booking_time
+        import time
+
+        last_booking_time = time.time()
+        print(
+            f"Appointment cancelled! Updated last_booking_time to {last_booking_time}"
+        )
+
+        # Send cancellation email async
+        import threading
+
+        def send_cancel_email_async():
+            try:
+                send_cancellation_email(
+                    appointment.email,
+                    appointment.client_name,
+                    appointment.appointment_time,
+                    appointment.service.name,
+                )
+                print(f"Cancellation email sent to {appointment.email}")
+            except Exception as e:
+                print(f"Cancellation email error: {e}")
+
+        threading.Thread(target=send_cancel_email_async, daemon=True).start()
+
+        return templates.TemplateResponse("cancel_success.html", {"request": request})
+    else:
+        return templates.TemplateResponse(
+            "cancel_appointment.html",
+            {"request": request, "appointment": None, "cancel_token": cancel_token},
+        )
+
+
+# Real-time update system
+active_connections = []
+
+
+@app.get("/api/live-updates")
+async def live_updates(request: Request):
+    async def event_stream():
+        import asyncio
+        import json
+
+        # Add this connection to active connections
+        queue = asyncio.Queue()
+        active_connections.append(queue)
+
+        try:
+            while True:
+                # Wait for updates or timeout after 30 seconds
+                try:
+                    message = await asyncio.wait_for(queue.get(), timeout=30.0)
+                    yield f"data: {json.dumps(message)}\n\n"
+                except asyncio.TimeoutError:
+                    # Send heartbeat
+                    yield f'data: {{"type": "heartbeat", "timestamp": {time.time()}}}\n\n'
+        except asyncio.CancelledError:
+            active_connections.remove(queue)
+            raise
+        finally:
+            if queue in active_connections:
+                active_connections.remove(queue)
+
+    return EventSourceResponse(event_stream())
+
+
+async def broadcast_update(update_type: str, data: dict = None):
+    """Broadcast real-time updates to all connected dashboards"""
+    if active_connections:
+        message = {"type": update_type, "data": data, "timestamp": time.time()}
+        print(f"Broadcasting to {len(active_connections)} connections: {message}")
+
+        # Send to all active connections
+        for queue in active_connections.copy():
+            try:
+                queue.put_nowait(message)
+            except Exception:
+                # Remove broken connections
+                if queue in active_connections:
+                    active_connections.remove(queue)
+
+
+@app.get("/api/check-refresh")
+async def check_refresh(last_check: str = "0"):
+    try:
+        last_check_float = float(last_check) if last_check != "undefined" else 0
+    except Exception:
+        last_check_float = 0
+
+    return {
+        "refresh_needed": last_booking_time > last_check_float,
+        "timestamp": last_booking_time,
+    }
+
+
+@app.get("/debug/luca-appointments")
+async def debug_luca_appointments(db: Session = Depends(get_db)):
+    try:
+        from datetime import datetime, timedelta
+
+        today = datetime.now().date()
+
+        # Find Luca's barber ID
+        luca = db.query(models.Barber).filter(models.Barber.name == "Luca").first()
+        if not luca:
+            return {"error": "Luca not found"}
+
+        # Get ALL appointments for Luca today
+        appointments = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.barber_id == luca.id,
+                models.Appointment.appointment_time >= today,
+                models.Appointment.appointment_time < today + timedelta(days=1),
+            )
+            .order_by(models.Appointment.appointment_time, models.Appointment.id)
+            .all()
+        )
+
+        result = []
+        for apt in appointments:
+            result.append(
+                {
+                    "id": apt.id,
+                    "client_name": apt.client_name,
+                    "time": apt.appointment_time.strftime("%H:%M"),
+                    "status": apt.status,
+                    "is_online": apt.is_online or 0,
+                    "service": apt.service.name if apt.service else "Unknown",
+                    "barber_id": apt.barber_id,
+                }
+            )
+
+        return {"luca_appointments": result, "count": len(result), "barber_id": luca.id}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/export-data")
+async def export_data(db: Session = Depends(get_db)):
+    barbers = db.query(models.Barber).all()
+    services = db.query(models.Service).all()
+
+    return {
+        "barbers": [{"name": b.name, "active": b.active} for b in barbers],
+        "services": [
+            {
+                "name": s.name,
+                "description": s.description,
+                "duration": s.duration,
+                "price": s.price,
+            }
+            for s in services
+        ],
+    }
+
+
+if __name__ == "__main__":
+    import os
+
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)  # nosec B104
+
+
+@app.get("/sentry-debug")
+async def trigger_error():
+    """Sentry verification endpoint - triggers test error"""
+    1 / 0  # noqa: F841
+    return {"status": "never reached"}

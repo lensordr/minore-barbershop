@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - MINORE BARBER{% endblock %}
+
+{% block header %}
+<nav class="admin-nav">
+    <a href="/admin/dashboard?location={{ location_id }}" class="active">Dashboard</a>
+    <a href="/admin/staff?location={{ location_id }}">Staff</a>
+    <a href="/admin/clients?location={{ location_id }}">Clients</a>
+    <a href="/admin/revenue?location={{ location_id }}">Revenue</a>
+    <a href="/admin/logout" class="logout-btn">Logout</a>
+</nav>
+{% endblock %}
+
+{% block content %}
+<div class="container full-width">
+<div class="dashboard">
+    {% if message %}
+    <div class="success-message" style="background: #d4edda; color: #155724; padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;">{{ message }}</div>
+    {% endif %}
+    
+    <!-- Mobile Barber Selector -->
+    <div class="mobile-barber-selector" style="display: none;">
+        <label for="mobileBarberSelect" style="color: #fbcc93; font-weight: bold; margin-bottom: 0.5rem; display: block;">Select Barber:</label>
+        <select id="mobileBarberSelect" onchange="filterByBarber(this.value)" style="width: 100%; padding: 0.75rem; border-radius: 8px; border: 1px solid #444; background: #2a2a2a; color: #fbcc93; font-size: 1rem;">
+            <option value="all">All Barbers</option>
+            {% for barber in all_barbers %}
+            <option value="{{ barber.id }}">{{ barber.name }}{% if not barber.active %} (Closed){% endif %}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    
+    <div class="appointment-stats">
+        <h2>Today's Appointments</h2>
+        <div class="stats-row">
+            <span class="stat">Total: {{ counts.total }}</span>
+            <span class="stat completed">Completed: {{ counts.completed }}</span>
+            <span class="stat cancelled">Cancelled: {{ counts.cancelled }}</span>
+
+        </div>
+    </div>
+    
+    <!-- Date Selector for All Views -->
+    <div class="date-selector" style="margin: 1.5rem 0; padding: 1rem; background: #2a2a2a; border-radius: 8px;">
+        <label for="dateSelect" style="color: #fbcc93; font-weight: bold; margin-bottom: 0.5rem; display: block; font-size: 1.1rem;">📅 Select Date:</label>
+        <select id="dateSelect" onchange="changeDate(this.value)" style="width: 100%; max-width: 300px; padding: 0.75rem; border-radius: 8px; border: 2px solid #fbcc93; background: #1d1a1c; color: #fbcc93; font-size: 1rem; cursor: pointer;">
+            <option value="today" selected>Today</option>
+            <option value="tomorrow">Tomorrow (VIP Bookings)</option>
+        </select>
+    </div>
+    
+    <div class="scroll-indicator">👈 Swipe left/right to see all barbers 👉</div>
+    <div class="schedule-grid">
+        <!-- Header with barber names -->
+        <div class="grid-header">
+            <div class="time-header">Time</div>
+            {% for barber in all_barbers %}
+            <div class="barber-header{% if not barber.active %} inactive{% endif %}">{{ barber.name }}{% if not barber.active %} (Closed){% endif %}</div>
+            {% endfor %}
+        </div>
+        
+        <!-- Time rows with appointments -->
+        {% for hour in grid_data.hours %}
+        <div class="grid-row">
+            <div class="time-cell">{{ hour }}</div>
+            {% for barber in all_barbers %}
+            <div class="appointment-cell{% if not barber.active %} inactive-cell{% endif %}">
+                {% set slot = grid_data.grid[barber.id][hour] %}
+                {% if slot.type == "appointment" %}
+                    {% set appointment = slot.appointment %}
+                    {% set duration = appointment.custom_duration or appointment.service.duration %}
+                    {% if appointment.status != "cancelled" %}
+                    <div class="appointment-item appointment-{{ appointment.status }}{% if appointment.status == 'scheduled' %}{% if appointment.is_random %} appointment-random{% elif appointment.is_online == 2 %} appointment-vip{% elif appointment.is_online %} appointment-online{% endif %}{% endif %}" 
+                         onclick="editAppointment({{ appointment.id }}, '{{ appointment.client_name|replace("'", "\\'") }}', '{{ appointment.service.name|replace("'", "\\'") }}', {{ appointment.custom_price or appointment.service.price }}, {{ duration }}, '{{ appointment.appointment_time.strftime('%H:%M') }}', '{{ appointment.status }}', {{ appointment.barber_id }})" 
+                         style="cursor: pointer; height: {{ slot.span_rows * 60 - 4 }}px; margin-bottom: -{{ (slot.span_rows - 1) * 60 }}px; z-index: 10; position: relative;">
+                        <div class="client-name">{{ appointment.client_name.split()[0] }}{% if appointment.is_random %} 🎲{% elif appointment.is_online == 2 %} ⭐{% endif %}</div>
+                        <div class="service-code">
+                            {% if "Haircut" in appointment.service.name and "Beard" in appointment.service.name and "Ritual" in appointment.service.name %}
+                                C+B-R
+                            {% elif "Haircut" in appointment.service.name and "Beard" in appointment.service.name and "Express" in appointment.service.name %}
+                                C+B-E
+                            {% elif "Haircut" in appointment.service.name and "Beard" not in appointment.service.name %}
+                                C
+                            {% elif "Beard" in appointment.service.name and "Trim" in appointment.service.name and "Express" in appointment.service.name %}
+                                BE
+                            {% elif "Beard" in appointment.service.name and "Trim" in appointment.service.name and "Ritual" in appointment.service.name %}
+                                BR
+                            {% else %}
+                                {{ appointment.service.name[:3] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
+                {% elif slot.type == "continuation" %}
+                    <!-- Covered by appointment card above -->
+                {% elif slot.type == "empty" and barber.active %}
+                    <div class="empty-slot clickable-slot" 
+                         data-barber-id="{{ barber.id }}" 
+                         data-barber-name="{{ barber.name }}" 
+                         data-time="{{ hour }}" 
+                         onclick="openQuickBooking(this)">+</div>
+                {% else %}
+                    <div class="empty-slot">{% if barber.active %}-{% else %}Closed{% endif %}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    
+    {% if not appointments %}
+    <div class="no-appointments">
+        <p>No appointments scheduled for today.</p>
+    </div>
+    {% endif %}
+    
+
+</div>
+</div>
+
+<!-- Quick Booking Modal -->
+<div id="quickBookingModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeQuickBooking()">&times;</span>
+        <h3>Quick Appointment</h3>
+        <form id="quickBookingForm" onsubmit="submitQuickBooking(event)">
+            <div class="form-group">
+                <label>Barber:</label>
+                <span id="selectedBarber"></span>
+            </div>
+            <div class="form-group">
+                <label>Time:</label>
+                <span id="selectedTime"></span>
+            </div>
+            <div class="form-group">
+                <label for="quickClientPhone">Phone Number:</label>
+                <input type="tel" id="quickClientPhone" name="client_phone" onblur="checkExistingClient()">
+            </div>
+            
+            <div class="form-group" id="clientNameGroup">
+                <label for="quickClientName">Client Name *:</label>
+                <input type="text" id="quickClientName" name="client_name" required>
+            </div>
+            
+            <div id="existingClientInfo" style="display: none; padding: 0.5rem; background: #e8f5e9; border-radius: 4px; margin-bottom: 1rem;">
+                <span style="color: #2e7d32;">✓ Existing client: <strong id="existingClientName"></strong></span>
+            </div>
+
+            <div class="form-group">
+                <label for="quickService">Service:</label>
+                <select id="quickService" name="service_id" required onchange="updateServiceDuration()">
+                    <option value="">Select service</option>
+                    {% for service in services %}
+                    <option value="{{ service.id }}" data-duration="{{ service.duration }}" data-price="{{ service.price }}">{{ service.name }} - €{{ service.price }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quickDuration">Duration (minutes):</label>
+                <select id="quickDuration" name="duration" required>
+                    <option value="30">30 minutes</option>
+                    <option value="60">1 hour</option>
+                    <option value="90">1.5 hours</option>
+                    <option value="120">2 hours</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quickPrice">Price (€):</label>
+                <input type="number" id="quickPrice" name="price" step="0.01" min="0" required>
+            </div>
+            <input type="hidden" id="quickBarberId" name="barber_id">
+            <input type="hidden" id="quickAppointmentTime" name="appointment_time">
+            <input type="hidden" id="quickLocationId" name="location_id" value="{{ location_id }}">
+            <div class="form-actions">
+                <button type="button" onclick="closeQuickBooking()" class="btn btn-secondary">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Appointment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Appointment Modal -->
+<div id="editAppointmentModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditAppointment()">&times;</span>
+        <h3>Edit Appointment</h3>
+        <div style="margin-bottom: 1rem;">
+            <button type="button" onclick="document.getElementById('editAppointmentForm').dispatchEvent(new Event('submit'))" class="btn btn-primary" style="width: 100%;">Update Appointment</button>
+        </div>
+        <form id="editAppointmentForm" onsubmit="submitEditAppointment(event)">
+            <div class="form-group">
+                <label for="editClientName">Client Name:</label>
+                <input type="text" id="editClientName" name="client_name" required>
+            </div>
+            <div class="form-group" id="editPhoneGroup" style="display: none;">
+                <label>Phone:</label>
+                <span id="editClientPhone" style="font-family: monospace; color: #666;"></span>
+            </div>
+            <div class="form-group">
+                <label>Service:</label>
+                <span id="editServiceName"></span>
+            </div>
+            <div class="form-group">
+                <label for="editBarber">Barber:</label>
+                <select id="editBarber" name="barber_id" required onchange="loadAvailableTimesForEdit()">
+                    {% for barber in barbers %}
+                    <option value="{{ barber.id }}">{{ barber.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="editTime">Time:</label>
+                <select id="editTime" name="time" required style="width: 100%; padding: 0.75rem; border: 1px solid #444; border-radius: 4px; background: #2a2a2a; color: #fbcc93; font-size: 1rem;">
+                    <option value="">Loading...</option>
+                </select>
+            </div>
+            <input type="hidden" id="editServiceId" name="service_id">
+            <div class="form-group">
+                <label for="editPrice">Price (€):</label>
+                <input type="number" id="editPrice" name="price" step="0.01" min="0" required>
+            </div>
+            <div class="form-group">
+                <label for="editDuration">Duration (minutes):</label>
+                <input type="number" id="editDuration" name="duration" min="1" required>
+            </div>
+            <input type="hidden" id="editAppointmentId" name="appointment_id">
+            <div class="form-actions" style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                <div id="appointmentActions" style="display: flex; gap: 0.5rem;">
+                    <button type="button" onclick="completeAppointment()" class="btn btn-primary" style="padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">Complete & Checkout</button>
+                    <button type="button" onclick="cancelAppointment()" class="btn btn-cancel" style="padding: 0.6rem 1rem; font-size: 1rem; flex: 1;">Cancel Appointment</button>
+                </div>
+                <div id="completedActions" style="display: none; gap: 0.5rem;">
+                    <button type="button" onclick="reopenAppointment()" class="btn" style="background: #ff9800; color: white; padding: 0.6rem 1rem; font-size: 1rem; width: 100%;">Reopen Appointment</button>
+                </div>
+                <button type="button" onclick="closeEditAppointment()" class="btn btn-secondary">Close</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Check if client exists by phone number
+function checkExistingClient() {
+    const phone = document.getElementById('quickClientPhone').value.trim();
+    if (!phone) return;
+    
+    fetch(`/api/check-client?phone=${encodeURIComponent(phone)}`)
+        .then(response => response.json())
+        .then(data => {
+            const existingInfo = document.getElementById('existingClientInfo');
+            const nameInput = document.getElementById('quickClientName');
+            
+            if (data.exists) {
+                // Existing client
+                existingInfo.style.display = 'block';
+                document.getElementById('existingClientName').textContent = data.name;
+                nameInput.value = data.name;
+            } else {
+                // New client
+                existingInfo.style.display = 'none';
+                nameInput.value = '';
+            }
+        })
+        .catch(error => {
+            console.error('Error checking client:', error);
+        });
+}
+
+function openQuickBooking(slot) {
+    const barberId = slot.dataset.barberId;
+    const barberName = slot.dataset.barberName;
+    const time = slot.dataset.time;
+    
+    document.getElementById('selectedBarber').textContent = barberName;
+    document.getElementById('selectedTime').textContent = time;
+    document.getElementById('quickBarberId').value = barberId;
+    
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('quickAppointmentTime').value = `${today}T${time}:00`;
+    
+    // Reset form state
+    document.getElementById('existingClientInfo').style.display = 'none';
+    
+    document.getElementById('quickBookingModal').style.display = 'block';
+    document.getElementById('quickClientName').focus();
+}
+
+function closeQuickBooking() {
+    document.getElementById('quickBookingModal').style.display = 'none';
+    document.getElementById('quickBookingForm').reset();
+    // Reset form state
+    document.getElementById('existingClientInfo').style.display = 'none';
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('quickBookingModal');
+    if (event.target == modal) {
+        closeQuickBooking();
+    }
+}
+
+// Update duration and price when service is selected
+function updateServiceDuration() {
+    const serviceSelect = document.getElementById('quickService');
+    const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
+    
+    if (selectedOption.value) {
+        const duration = selectedOption.getAttribute('data-duration');
+        const price = selectedOption.getAttribute('data-price');
+        
+        document.getElementById('quickDuration').value = duration;
+        document.getElementById('quickPrice').value = price;
+    }
+}
+
+// AJAX submission with immediate refresh
+function submitQuickBooking(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creating...';
+    
+    // Save current barber selection
+    const currentBarber = document.getElementById('mobileBarberSelect')?.value;
+    if (currentBarber) {
+        localStorage.setItem('selectedBarber', currentBarber);
+    }
+    
+    fetch('/admin/add-appointment', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeQuickBooking();
+            location.reload();
+        } else {
+            alert(data.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error creating appointment');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+}
+
+// Edit appointment functions
+function editAppointment(id, clientName, serviceName, price, duration, time, status, barberId) {
+    document.getElementById('editAppointmentId').value = id;
+    document.getElementById('editClientName').value = clientName;
+    document.getElementById('editServiceName').textContent = serviceName;
+    document.getElementById('editPrice').value = price;
+    document.getElementById('editDuration').value = duration;
+    document.getElementById('editBarber').value = barberId;
+    
+    // Store current time and fetch service_id
+    window.currentEditTime = time;
+    fetch(`/api/appointment-details/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('editServiceId').value = data.service_id;
+            loadAvailableTimesForEdit();
+            
+            // Get phone info
+            const phoneGroup = document.getElementById('editPhoneGroup');
+            const phoneSpan = document.getElementById('editClientPhone');
+            if (data.phone && data.phone.trim()) {
+                phoneSpan.textContent = data.phone;
+                phoneGroup.style.display = 'block';
+            } else {
+                phoneGroup.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading appointment details:', error);
+            document.getElementById('editPhoneGroup').style.display = 'none';
+        });
+    
+    // Show/hide action buttons based on status
+    const actionButtons = document.getElementById('appointmentActions');
+    const completedButtons = document.getElementById('completedActions');
+    if (status === 'scheduled') {
+        actionButtons.style.display = 'flex';
+        completedButtons.style.display = 'none';
+    } else if (status === 'completed') {
+        actionButtons.style.display = 'none';
+        completedButtons.style.display = 'flex';
+    } else {
+        actionButtons.style.display = 'none';
+        completedButtons.style.display = 'none';
+    }
+    
+    document.getElementById('editAppointmentModal').style.display = 'block';
+}
+
+function closeEditAppointment() {
+    document.getElementById('editAppointmentModal').style.display = 'none';
+    document.getElementById('editAppointmentForm').reset();
+}
+
+function submitEditAppointment(event) {
+    event.preventDefault();
+    const form = event.target;
+    const formData = new FormData(form);
+    
+    fetch('/admin/edit-appointment', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            closeEditAppointment();
+            location.reload();
+        } else {
+            alert(data.message);
+        }
+    });
+}
+
+function loadAvailableTimesForEdit() {
+    const barberId = document.getElementById('editBarber').value;
+    const serviceId = document.getElementById('editServiceId').value;
+    const timeSelect = document.getElementById('editTime');
+    
+    if (!barberId || !serviceId) return;
+    
+    timeSelect.innerHTML = '<option value="">Loading...</option>';
+    
+    fetch(`/api/available-times/${barberId}/${serviceId}?date_selection=today&t=${Date.now()}`)
+        .then(response => response.json())
+        .then(times => {
+            timeSelect.innerHTML = '';
+            times.forEach(time => {
+                const option = document.createElement('option');
+                option.value = time;
+                option.textContent = time;
+                timeSelect.appendChild(option);
+            });
+            
+            // Set current time if available (normalize to HH:MM format)
+            if (window.currentEditTime) {
+                const normalizedTime = window.currentEditTime.substring(0, 5); // Get HH:MM only
+                timeSelect.value = normalizedTime;
+            }
+        })
+        .catch(error => {
+            console.error('Error loading times:', error);
+            timeSelect.innerHTML = '<option value="">Error loading times</option>';
+        });
+}
+
+function completeAppointment() {
+    const appointmentId = document.getElementById('editAppointmentId').value;
+    const currentPrice = document.getElementById('editPrice').value;
+    const currentDuration = document.getElementById('editDuration').value;
+    const currentTime = document.getElementById('editTime').value;
+    
+    // Update and checkout in single operation
+    const formData = new FormData();
+    formData.append('appointment_id', appointmentId);
+    formData.append('time', currentTime);
+    formData.append('price', currentPrice);
+    formData.append('duration', currentDuration);
+    
+    fetch('/admin/edit-appointment', {
+        method: 'POST',
+        body: formData
+    })
+    .then(() => fetch(`/admin/checkout/${appointmentId}`, { method: 'POST' }))
+    .then(() => {
+        closeEditAppointment();
+        location.reload();
+    });
+}
+
+function cancelAppointment() {
+    if (confirm('Are you sure you want to cancel this appointment?')) {
+        const appointmentId = document.getElementById('editAppointmentId').value;
+        
+        fetch(`/admin/cancel/${appointmentId}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(() => {
+            closeEditAppointment();
+            location.reload();
+        });
+    }
+}
+
+function reopenAppointment() {
+    if (confirm('Reopen this completed appointment? This will remove it from revenue.')) {
+        const appointmentId = document.getElementById('editAppointmentId').value;
+        
+        fetch(`/admin/reopen/${appointmentId}`, { method: 'POST' })
+        .then(() => {
+            closeEditAppointment();
+            location.reload();
+        });
+    }
+}
+
+// Simple polling for updates - fast and reliable
+console.log('Setting up polling for updates');
+let lastCheck = Date.now() / 1000;
+setInterval(() => {
+    fetch(`/api/check-refresh?last_check=${lastCheck}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.refresh_needed) {
+                console.log('New appointment detected - refreshing!');
+                location.reload();
+            }
+            lastCheck = data.timestamp;
+        })
+        .catch(error => console.log('Polling failed:', error));
+}, 3000); // 3 second polling for fast updates
+
+// Mobile view: Show barber selector and filter columns
+function filterByBarber(barberId) {
+    // Save selection to localStorage
+    if (barberId) {
+        localStorage.setItem('selectedBarber', barberId);
+    }
+    
+    const headers = document.querySelectorAll('.barber-header');
+    const cells = document.querySelectorAll('.appointment-cell');
+    
+    if (barberId === 'all') {
+        // Show all barbers
+        headers.forEach(h => h.style.display = 'block');
+        cells.forEach(c => c.style.display = 'block');
+    } else {
+        // Show only selected barber
+        const barberIndex = Array.from(headers).findIndex(h => {
+            const cell = document.querySelectorAll('.appointment-cell')[Array.from(headers).indexOf(h)];
+            return cell && cell.querySelector('.empty-slot[data-barber-id="' + barberId + '"]');
+        });
+        
+        headers.forEach((h, i) => {
+            const cells = document.querySelectorAll(`.grid-row .appointment-cell:nth-child(${i + 2})`);
+            if (h.textContent.includes(document.querySelector(`option[value="${barberId}"]`).textContent.split(' (')[0])) {
+                h.style.display = 'block';
+                cells.forEach(c => c.style.display = 'block');
+            } else {
+                h.style.display = 'none';
+                cells.forEach(c => c.style.display = 'none');
+            }
+        });
+    }
+}
+
+// Show mobile selector on small screens
+if (window.innerWidth <= 768) {
+    document.querySelector('.mobile-barber-selector').style.display = 'block';
+    document.querySelector('.scroll-indicator').style.display = 'none';
+    
+    // Restore saved barber or default to Luca
+    const savedBarber = localStorage.getItem('selectedBarber');
+    const selectElement = document.getElementById('mobileBarberSelect');
+    
+    if (savedBarber && selectElement.querySelector(`option[value="${savedBarber}"]`)) {
+        selectElement.value = savedBarber;
+        filterByBarber(savedBarber);
+    } else {
+        // Default to Luca on first load
+        const lucaOption = Array.from(selectElement.options).find(opt => opt.text.includes('Luca'));
+        if (lucaOption) {
+            selectElement.value = lucaOption.value;
+            filterByBarber(lucaOption.value);
+        }
+    }
+}
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth <= 768) {
+        document.querySelector('.mobile-barber-selector').style.display = 'block';
+        document.querySelector('.scroll-indicator').style.display = 'none';
+    } else {
+        document.querySelector('.mobile-barber-selector').style.display = 'none';
+        document.querySelector('.scroll-indicator').style.display = 'block';
+        filterByBarber('all'); // Reset to show all
+    }
+});
+
+// Change date function
+function changeDate(dateValue) {
+    const currentUrl = new URL(window.location.href);
+    if (dateValue === 'tomorrow') {
+        currentUrl.searchParams.set('date', 'tomorrow');
+    } else {
+        currentUrl.searchParams.delete('date');
+    }
+    window.location.href = currentUrl.toString();
+}
+
+// Set date selector based on URL parameter
+const urlParams = new URLSearchParams(window.location.search);
+const dateParam = urlParams.get('date');
+if (dateParam === 'tomorrow') {
+    document.getElementById('dateSelect').value = 'tomorrow';
+}
+</script>
+{% endblock %}
+
+{% block scripts %}
+{% endblock %}

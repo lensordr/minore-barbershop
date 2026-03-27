@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Appointment Confirmed - MINORE BARBERSHOP{% endblock %}
+
+{% block content %}
+<div class="success-message">
+    <div class="success-icon">✓</div>
+    <h2>Appointment Confirmed!</h2>
+    <p>Your appointment has been successfully booked.</p>
+    
+    <div class="next-steps">
+        <h3>What's Next?</h3>
+        <p>📱 <strong>Check your client dashboard</strong> to view appointment details</p>
+        <p>🔄 Use your dashboard to cancel or reschedule if needed</p>
+        <p>⏰ Arrive 5 minutes early for your appointment</p>
+    </div>
+    
+    <div class="action-buttons">
+        <a href="/client/dashboard" class="btn btn-primary">View My Dashboard</a>
+        <a href="/locations" class="btn btn-secondary">Book Another</a>
+    </div>
+    
+    <p style="margin-top: 2rem;">We'll see you soon at MINORE BARBER - {{ location }}!</p>
+</div>
+
+<style>
+.next-steps {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 5px;
+    margin: 2rem 0;
+    text-align: left;
+}
+
+.next-steps h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.next-steps p {
+    margin: 0.5rem 0;
+}
+
+.action-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 2rem 0;
+}
+
+.action-buttons .btn {
+    flex: 1;
+    max-width: 200px;
+}
+</style>
+{% endblock %}

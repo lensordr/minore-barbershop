@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MINORE BARBERSHOP - Select Location</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        body {
+            background-color: #1d1a1c;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .location-container {
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 40px;
+            background: #2a2529;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid #333;
+            text-align: center;
+        }
+        
+        .location-title {
+            font-size: 2.5rem;
+            color: #fbcc93;
+            margin-bottom: 20px;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .location-subtitle {
+            color: #fbcc93;
+            opacity: 0.8;
+            margin-bottom: 40px;
+            font-size: 1.1rem;
+        }
+        
+        .location-buttons {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .location-btn {
+            display: block;
+            padding: 30px 40px;
+            background: #fbcc93;
+            color: #1d1a1c;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            min-width: 200px;
+            box-shadow: 0 5px 15px rgba(251, 204, 147, 0.3);
+            border: 2px solid #fbcc93;
+        }
+        
+        .location-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(251, 204, 147, 0.4);
+            background: #f4b876;
+        }
+        
+        .location-btn.concell {
+            background: #2a2529;
+            color: #fbcc93;
+            border: 2px solid #fbcc93;
+            box-shadow: 0 5px 15px rgba(42, 37, 41, 0.3);
+        }
+        
+        .location-btn.concell:hover {
+            background: #333;
+            box-shadow: 0 8px 25px rgba(42, 37, 41, 0.4);
+        }
+        
+        .location-info {
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #444;
+            color: #fbcc93;
+            opacity: 0.8;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .location-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .location-btn {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="location-container">
+        <h1 class="location-title">MINORE BARBERSHOP</h1>
+        <p class="location-subtitle">Choose your preferred location to book an appointment</p>
+        
+        <div class="location-buttons">
+            <a href="/client/book/mallorca" class="location-btn mallorca">
+                📍 Carrer de Mallorca 233
+            </a>
+            <a href="/client/book/concell" class="location-btn concell">
+                📍 Consell de Cent 250
+            </a>
+        </div>
+        
+        <div class="location-info">
+            <p>Both locations offer professional barbering services with experienced staff</p>
+            <p>Same-day appointments available • Walk-ins welcome</p>
+        </div>
+    </div>
+</body>
+</html>
