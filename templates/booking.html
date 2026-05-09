@@ -103,7 +103,7 @@
             </select>
         </div>
 
-        <button type="submit" class="btn btn-primary">Book Appointment</button>
+        <button type="submit" class="btn btn-primary" id="submitBtn" onclick="this.disabled=true; this.textContent='Booking...'; this.form.submit();">Book Appointment</button>
     </form>
     {% endif %}
 </div>

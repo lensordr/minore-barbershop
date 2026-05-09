@@ -273,6 +273,37 @@ def create_appointment(
         if appointment_dt < existing_end and appointment_end > apt_time:
             raise ValueError("Time slot conflicts with existing appointment")
 
+    # Guard against duplicate submissions: same client cannot have two scheduled
+    # appointments at the exact same time (catches double-clicks / back-button resubmits)
+    client_check = get_client_by_phone(db, phone)
+    if client_check:
+        duplicate = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.client_id == client_check.id,
+                models.Appointment.appointment_time == appointment_dt,
+                models.Appointment.status != "cancelled",
+            )
+            .first()
+        )
+        if duplicate:
+            raise ValueError("You already have an appointment at this time")
+
+        # Prevent a client from having more than one active scheduled appointment per day
+        same_day_scheduled = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.client_id == client_check.id,
+                models.Appointment.appointment_time >= day_start,
+                models.Appointment.appointment_time < day_end,
+                models.Appointment.status == "scheduled",
+                models.Appointment.is_online.in_([1, 2]),  # only online bookings
+            )
+            .count()
+        )
+        if same_day_scheduled >= 1:
+            raise ValueError("You already have an appointment booked for today. Please cancel it before booking a new one.")
+
     # Get or create client account
     client = get_or_create_client(db, phone, client_name, email)
 

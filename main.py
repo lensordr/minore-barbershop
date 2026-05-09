@@ -423,14 +423,22 @@ async def client_book_appointment(
     client_phone_cookie: str = Cookie(None, alias="client_phone"),
     db: Session = Depends(get_db),
 ):
+    location_id = 1 if location.lower() == "mallorca" else 2
+    location_name = "Mallorca" if location_id == 1 else "Concell"
+
+    # Security: use the phone from the session cookie, not the hidden form field
+    # This prevents a user from booking on behalf of another client
+    effective_phone = client_phone_cookie or client_phone
+    if not effective_phone:
+        return RedirectResponse(url="/client/login", status_code=303)
+
+    client = crud.get_client_by_phone(db, effective_phone)
+    if not client:
+        return RedirectResponse(url="/client/login", status_code=303)
+
     if not barber_id or not appointment_time:
-        services = crud.get_services_by_location(
-            db, 1 if location.lower() == "mallorca" else 2
-        )
-        barbers = crud.get_active_barbers_by_location(
-            db, 1 if location.lower() == "mallorca" else 2
-        )
-        location_name = "Mallorca" if location.lower() == "mallorca" else "Concell"
+        services = crud.get_services_by_location(db, location_id)
+        barbers = crud.get_active_barbers_by_location(db, location_id)
         return templates.TemplateResponse(
             "booking.html",
             {
@@ -438,16 +446,19 @@ async def client_book_appointment(
                 "services": services,
                 "barbers": barbers,
                 "location": location_name,
-                "location_id": 1 if location.lower() == "mallorca" else 2,
+                "location_id": location_id,
+                "client": client,
+                "vip_code": vip_code,
+                "vip_barber": None,
+                "show_random": True,
                 "error": "Please select a barber and time slot.",
             },
         )
-    location_id = 1 if location.lower() == "mallorca" else 2
     return await create_appointment_helper(
         request,
-        client_name,
+        client.name or client_name,
         client_email,
-        client_phone,
+        effective_phone,
         service_id,
         barber_id,
         appointment_time,
@@ -474,6 +485,7 @@ async def create_appointment_mallorca(
     service_id: int = Form(...),
     barber_id: str = Form(...),
     appointment_time: str = Form(...),
+    vip_code: str = Form(""),
     db: Session = Depends(get_db),
 ):
     return await create_appointment_helper(
@@ -485,6 +497,7 @@ async def create_appointment_mallorca(
         barber_id,
         appointment_time,
         1,
+        vip_code,
         db,
     )
 
@@ -498,6 +511,7 @@ async def create_appointment_concell(
     service_id: int = Form(...),
     barber_id: str = Form(...),
     appointment_time: str = Form(...),
+    vip_code: str = Form(""),
     db: Session = Depends(get_db),
 ):
     return await create_appointment_helper(
@@ -509,6 +523,7 @@ async def create_appointment_concell(
         barber_id,
         appointment_time,
         2,
+        vip_code,
         db,
     )
 
@@ -619,10 +634,14 @@ async def create_appointment_helper(
         return RedirectResponse(
             url=f"/{location_path}/success?email={email_param}", status_code=303
         )
-    except ValueError:
+    except ValueError as e:
+        # Re-fetch client so the form renders with correct hidden fields
+        client = crud.get_client_by_phone(db, client_phone)
         services = crud.get_services_by_location(db, location_id)
         barbers = crud.get_active_barbers_by_location(db, location_id)
         location_name = "Mallorca" if location_id == 1 else "Concell"
+        # Show the real error message so users understand what went wrong
+        error_msg = str(e) if str(e) else "Time slot already booked! Please select another time."
         return templates.TemplateResponse(
             "booking.html",
             {
@@ -631,7 +650,11 @@ async def create_appointment_helper(
                 "barbers": barbers,
                 "location": location_name,
                 "location_id": location_id,
-                "error": "Time slot already booked! Please select another time.",
+                "client": client,
+                "vip_code": vip_code,
+                "vip_barber": None,
+                "show_random": True,
+                "error": error_msg,
             },
         )
 
