@@ -83,7 +83,7 @@
                     <div class="barber-avatar">
                         <img src="/static/photos/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}/{{ barber.name }}.jpg"
                              alt="{{ barber.name }}"
-                             onerror="this.src='/static/photos/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}/{{ barber.name }}.PNG'">
+                             onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.PNG');}else if(this.src.endsWith('.PNG')){this.src='/static/photos/placeholder.svg';this.onerror=null;}">
                     </div>
                     <div class="barber-info">
                         <div class="barber-name">{{ barber.name }}</div>

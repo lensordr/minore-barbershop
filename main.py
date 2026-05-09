@@ -413,9 +413,9 @@ async def client_logout():
 async def client_book_appointment(
     request: Request,
     location: str,
-    client_name: str = Form(...),
+    client_name: str = Form(""),
     client_email: str = Form(""),
-    client_phone: str = Form(...),
+    client_phone: str = Form(""),
     service_id: int = Form(...),
     barber_id: str = Form(None),
     appointment_time: str = Form(None),
@@ -426,8 +426,8 @@ async def client_book_appointment(
     location_id = 1 if location.lower() == "mallorca" else 2
     location_name = "Mallorca" if location_id == 1 else "Concell"
 
-    # Security: use the phone from the session cookie, not the hidden form field
-    # This prevents a user from booking on behalf of another client
+    # Security: use the phone from the session cookie as the authoritative source.
+    # The hidden form field is a fallback only — this prevents booking on behalf of others.
     effective_phone = client_phone_cookie or client_phone
     if not effective_phone:
         return RedirectResponse(url="/client/login", status_code=303)
@@ -479,9 +479,9 @@ async def book_appointment_redirect(request: Request, db: Session = Depends(get_
 @app.post("/mallorca/book")
 async def create_appointment_mallorca(
     request: Request,
-    client_name: str = Form(...),
+    client_name: str = Form(""),
     client_email: str = Form(""),
-    client_phone: str = Form(...),
+    client_phone: str = Form(""),
     service_id: int = Form(...),
     barber_id: str = Form(...),
     appointment_time: str = Form(...),
@@ -505,9 +505,9 @@ async def create_appointment_mallorca(
 @app.post("/concell/book")
 async def create_appointment_concell(
     request: Request,
-    client_name: str = Form(...),
+    client_name: str = Form(""),
     client_email: str = Form(""),
-    client_phone: str = Form(...),
+    client_phone: str = Form(""),
     service_id: int = Form(...),
     barber_id: str = Form(...),
     appointment_time: str = Form(...),
