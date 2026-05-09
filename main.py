@@ -641,7 +641,11 @@ async def create_appointment_helper(
         barbers = crud.get_active_barbers_by_location(db, location_id)
         location_name = "Mallorca" if location_id == 1 else "Concell"
         # Show the real error message so users understand what went wrong
-        error_msg = str(e) if str(e) else "Time slot already booked! Please select another time."
+        error_msg = (
+            str(e)
+            if str(e)
+            else "Time slot already booked! Please select another time."
+        )
         return templates.TemplateResponse(
             "booking.html",
             {

@@ -201,6 +201,7 @@ def create_appointment(
 
     appointment_dt = datetime.fromisoformat(appointment_time)
     from zoneinfo import ZoneInfo
+
     now = datetime.now(ZoneInfo("Europe/Madrid")).replace(tzinfo=None)
     today = now.date()
     appointment_date = appointment_dt.date()
@@ -302,7 +303,9 @@ def create_appointment(
             .count()
         )
         if same_day_scheduled >= 1:
-            raise ValueError("You already have an appointment booked for today. Please cancel it before booking a new one.")
+            raise ValueError(
+                "You already have an appointment booked for today. Please cancel it before booking a new one."
+            )
 
     # Get or create client account
     client = get_or_create_client(db, phone, client_name, email)
@@ -517,6 +520,7 @@ def get_available_times_for_service(
 ):
     # Always use CET (Barcelona time) — server runs on UTC
     from zoneinfo import ZoneInfo
+
     cet = ZoneInfo("Europe/Madrid")
     now = datetime.now(cet).replace(tzinfo=None)
     today = now.date()
