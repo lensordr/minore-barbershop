@@ -1,56 +1,49 @@
 {% extends "base.html" %}
 
-{% block title %}Appointment Confirmed - MINORE BARBERSHOP{% endblock %}
+{% block title %}Confirmed - MINORE BARBER{% endblock %}
 
 {% block content %}
-<div class="success-message">
-    <div class="success-icon">✓</div>
-    <h2>Appointment Confirmed!</h2>
-    <p>Your appointment has been successfully booked.</p>
-    
-    <div class="next-steps">
-        <h3>What's Next?</h3>
-        <p>📱 <strong>Check your client dashboard</strong> to view appointment details</p>
-        <p>🔄 Use your dashboard to cancel or reschedule if needed</p>
-        <p>⏰ Arrive 5 minutes early for your appointment</p>
-    </div>
-    
-    <div class="action-buttons">
-        <a href="/client/dashboard" class="btn btn-primary">View My Dashboard</a>
-        <a href="/locations" class="btn btn-secondary">Book Another</a>
-    </div>
-    
-    <p style="margin-top: 2rem;">We'll see you soon at MINORE BARBER - {{ location }}!</p>
+<div class="success-wrap">
+  <div class="success-icon">✓</div>
+  <h2>You're booked!</h2>
+  <p>Your appointment at MINORE BARBER — {{ location }} is confirmed.</p>
+  <p class="success-hint">Arrive 5 minutes early. Check your email for details.</p>
+  <div class="success-actions">
+    <a href="/client/dashboard" class="btn btn-primary">My appointments</a>
+    <a href="/locations" class="btn btn-secondary">Book another</a>
+  </div>
 </div>
 
 <style>
-.next-steps {
-    background: #f8f9fa;
-    padding: 1.5rem;
-    border-radius: 5px;
-    margin: 2rem 0;
-    text-align: left;
+.success-wrap {
+  max-width: 400px;
+  margin: 3rem auto;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  background: #2a2a2a;
+  border-radius: 12px;
+  border: 1px solid #333;
 }
-
-.next-steps h3 {
-    margin-top: 0;
-    color: #333;
+.success-icon {
+  font-size: 3.5rem;
+  color: #fbcc93;
+  margin-bottom: 0.75rem;
+  animation: pop 0.5s ease-out;
 }
-
-.next-steps p {
-    margin: 0.5rem 0;
+@keyframes pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  80%  { transform: scale(1.1); }
+  100% { transform: scale(1);   opacity: 1; }
 }
-
-.action-buttons {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-    margin: 2rem 0;
+.success-wrap h2 { color: #fbcc93; margin-bottom: 0.5rem; font-size: 1.4rem; }
+.success-wrap p  { color: #aaa; font-size: 0.9rem; margin-bottom: 0.4rem; }
+.success-hint    { color: #666 !important; font-size: 0.82rem !important; }
+.success-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.75rem;
 }
-
-.action-buttons .btn {
-    flex: 1;
-    max-width: 200px;
-}
+.success-actions .btn { flex: 1; max-width: 180px; text-align: center; }
 </style>
 {% endblock %}

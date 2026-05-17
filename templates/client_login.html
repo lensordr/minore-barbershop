@@ -1,117 +1,159 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login - MINORE BARBERSHOP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #1d1a1c;
+      color: #fbcc93;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+    .wrap {
+      width: 100%;
+      max-width: 380px;
+    }
+    .logo {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      margin-bottom: 0.3rem;
+    }
+    .tagline {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #666;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: #2a2a2a;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 1.75rem 1.5rem;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      color: #fbcc93;
+    }
+    .error {
+      background: #3a1a1a;
+      border: 1px solid #dc3545;
+      color: #ff8080;
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+    }
+    .field { margin-bottom: 1.1rem; }
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 0.45rem;
+    }
+    .field input {
+      width: 100%;
+      padding: 0.8rem 0.9rem;
+      background: #1d1a1c;
+      border: 1.5px solid #333;
+      border-radius: 8px;
+      color: #fbcc93;
+      font-size: 1rem;
+      font-family: inherit;
+      transition: border-color 0.2s;
+    }
+    .field input:focus { outline: none; border-color: #fbcc93; }
+    .field input[readonly] { opacity: 0.5; cursor: not-allowed; }
+    .field small { display: block; font-size: 0.75rem; color: #555; margin-top: 0.3rem; }
+    .btn {
+      width: 100%;
+      padding: 0.9rem;
+      background: #fbcc93;
+      color: #1d1a1c;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: #f4b876; }
+    .hint {
+      text-align: center;
+      font-size: 0.78rem;
+      color: #555;
+      margin-top: 1.25rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">MINORE</div>
+    <div class="tagline">BARBERSHOP</div>
 
-{% block title %}Client Login - MINORE BARBERSHOP{% endblock %}
+    <div class="card">
+      <div class="card-title">
+        {% if show_name_field %}Welcome! Tell us your name{% else %}Enter your phone number{% endif %}
+      </div>
 
-{% block content %}
-<div class="login-container">
-    <div class="login-form">
-        <h2>Welcome to MINORE BARBERSHOP</h2>
-        <p>Enter your phone number to continue</p>
-        
-        {% if error %}
-        <div class="error-message">{{ error }}</div>
-        {% endif %}
-        
-        <form method="POST" action="/client/login">
-            <div class="form-group">
-                <label for="phone">Phone Number *</label>
-                <input type="tel" id="phone" name="phone" placeholder="+34 123 456 789" value="{{ phone or '' }}" required {% if show_name_field %}readonly{% endif %}>
-                <small>We'll use this to find your appointments</small>
-            </div>
-            
-            {% if show_name_field %}
-            <div class="form-group">
-                <label for="name">Full Name *</label>
-                <input type="text" id="name" name="name" placeholder="Your full name" value="{{ name or '' }}" required autofocus>
-                <small>Required for new accounts</small>
-            </div>
-            
-            <div class="form-group">
-                <label for="email">Email (Optional)</label>
-                <input type="email" id="email" name="email" placeholder="your@email.com" value="{{ email or '' }}">
-                <small>For appointment confirmations</small>
-            </div>
-            {% endif %}
-            
-            <button type="submit" class="btn btn-primary">Continue</button>
-        </form>
-        
-        {% if not show_name_field %}
-        <div class="info-box">
-            <h3>New Customer?</h3>
-            <p>Just enter your phone number - we'll ask for your name if you're new!</p>
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/client/login">
+        <div class="field">
+          <label>Phone number</label>
+          <input type="tel" name="phone"
+                 placeholder="+34 600 000 000"
+                 value="{{ phone or '' }}"
+                 {% if show_name_field %}readonly{% endif %}
+                 required autofocus>
+        </div>
+
+        {% if show_name_field %}
+        <div class="field">
+          <label>Full name</label>
+          <input type="text" name="name"
+                 placeholder="Your name"
+                 value="{{ name or '' }}"
+                 required autofocus>
+        </div>
+        <div class="field">
+          <label>Email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#555;">optional</span></label>
+          <input type="email" name="email"
+                 placeholder="your@email.com"
+                 value="{{ email or '' }}">
+          <small>For appointment confirmations</small>
         </div>
         {% endif %}
+
+        <button type="submit" class="btn">Continue →</button>
+      </form>
+
+      <div class="hint">
+        {% if show_name_field %}
+          Creating a new account for {{ phone }}
+        {% else %}
+          New here? We'll ask for your name on the next step.
+        {% endif %}
+      </div>
     </div>
-</div>
-
-<style>
-.login-container {
-    max-width: 400px;
-    margin: 2rem auto;
-    padding: 2rem;
-    background: #2a2a2a;
-    border-radius: 8px;
-}
-
-.login-form h2 {
-    text-align: center;
-    color: #fbcc93;
-    margin-bottom: 1rem;
-}
-
-.form-group {
-    margin-bottom: 1.5rem;
-}
-
-.form-group label {
-    display: block;
-    color: #fbcc93;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #444;
-    border-radius: 4px;
-    background: #1d1a1c;
-    color: #fbcc93;
-    font-size: 1rem;
-}
-
-.form-group input[readonly] {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.form-group small {
-    color: #999;
-    font-size: 0.8rem;
-    margin-top: 0.25rem;
-    display: block;
-}
-
-.info-box {
-    margin-top: 2rem;
-    padding: 1rem;
-    background: #1d1a1c;
-    border-radius: 4px;
-    border-left: 4px solid #fbcc93;
-}
-
-.info-box h3 {
-    color: #fbcc93;
-    margin-bottom: 0.5rem;
-}
-
-.error-message {
-    background: #dc3545;
-    color: white;
-    padding: 0.75rem;
-    border-radius: 4px;
-    margin-bottom: 1rem;
-}
-</style>
-{% endblock %}
+  </div>
+</body>
+</html>

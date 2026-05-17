@@ -1,223 +1,482 @@
 {% extends "base.html" %}
 
-{% block title %}Book Appointment - MINORE BARBER{% endblock %}
+{% block title %}Book - MINORE BARBER{% endblock %}
 
 {% block content %}
-<div class="booking-form">
-    <div class="booking-header">
-        <h2>Book Your Appointment</h2>
-        {% if client %}
-        <div class="client-info">
-            <span>Welcome, {{ client.name or client.phone }}</span>
-            <a href="/client/dashboard" class="btn btn-secondary">My Appointments</a>
-        </div>
-        {% endif %}
+<div class="booking-wrap">
+
+  <!-- Header -->
+  <div class="bk-header">
+    <div class="bk-location">📍 {{ location }}</div>
+    {% if client %}
+    <div class="bk-user">
+      <span>{{ client.name or client.phone }}</span>
+      <a href="/client/dashboard" class="bk-link">My bookings</a>
     </div>
-
-    {% if error %}
-    <div class="error-message" style="padding:1.5rem; border-radius:8px; margin:1rem 0;">
-        ❌ {{ error }}
-        <div style="margin-top:1rem;">
-            <a href="/client/book/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}" class="btn btn-secondary">Go back</a>
-        </div>
-    </div>
-    {% else %}
-    <form method="POST" action="/client/book/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}" id="bookingForm">
-        <input type="hidden" name="client_name" value="{{ client.name or client.phone }}">
-        <input type="hidden" name="client_phone" value="{{ client.phone }}">
-
-        <div class="client-info-display">
-            <h3>Booking for: {{ client.name or client.phone }}</h3>
-            {% if client.email %}<p>Email: {{ client.email }}</p>{% endif %}
-        </div>
-
-        <div class="form-group">
-            <label for="client_email">Email (Optional - for confirmation):</label>
-            <input type="email" id="client_email" name="client_email" placeholder="your@email.com" value="{{ client.email or '' }}">
-            <small style="color: #666; display: block; margin-top: 0.25rem;">We'll send you a confirmation email</small>
-        </div>
-
-        <div class="form-group">
-            <label for="vip_code">VIP Code (Optional - For Early Access):</label>
-            <input type="text" id="vip_code" name="vip_code" placeholder="Enter VIP code" value="{{ vip_code or '' }}" style="text-transform: uppercase;" onchange="applyVipCode()">
-            <small style="color: #666; display: block; margin-top: 0.25rem;">Book special days 24h in advance with personalized barber codes (+€10)</small>
-        </div>
-
-        <div class="form-group">
-            <label for="service_id">Service</label>
-            <select id="service_id" name="service_id" required>
-                <option value="">Select a service</option>
-                {% for service in services %}
-                <option value="{{ service.id }}" data-price="{{ service.price }}" data-duration="{{ service.duration }}">
-                    {{ service.name }} - €{% if vip_barber %}{{ service.price + vip_barber.early_access_price_add }}{% else %}{{ service.price }}{% endif %} ({{ service.duration }}min)
-                </option>
-                {% endfor %}
-            </select>
-        </div>
-
-        {% if vip_barber %}
-        <div class="form-group" id="vipDateSelector">
-            <label for="appointment_date">Select Date</label>
-            <select id="appointment_date" name="appointment_date" onchange="updateAvailableTimes()">
-                <option value="today" selected>Today</option>
-                <option value="tomorrow">Tomorrow (VIP Early Access)</option>
-            </select>
-        </div>
-        {% endif %}
-
-        <div class="form-group">
-            <label>Choose Your Barber</label>
-            <div class="barber-list">
-                {% if show_random %}
-                <div class="barber-item" data-barber-id="random">
-                    <div class="barber-avatar random-avatar"><span>🎲</span></div>
-                    <div class="barber-info">
-                        <div class="barber-name">Random Barber</div>
-                        <div class="barber-desc">Let us choose for you</div>
-                    </div>
-                    <div class="barber-check"></div>
-                </div>
-                {% endif %}
-                {% for barber in barbers %}
-                <div class="barber-item" data-barber-id="{{ barber.id }}">
-                    <div class="barber-avatar">
-                        <img src="/static/photos/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}/{{ barber.name }}.jpg"
-                             alt="{{ barber.name }}"
-                             onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.PNG');}else if(this.src.endsWith('.PNG')){this.src='/static/photos/placeholder.svg';this.onerror=null;}">
-                    </div>
-                    <div class="barber-info">
-                        <div class="barber-name">{{ barber.name }}</div>
-                        <div class="barber-desc">Professional Barber</div>
-                    </div>
-                    <div class="barber-check"></div>
-                </div>
-                {% endfor %}
-            </div>
-            <input type="hidden" id="barber_id" name="barber_id" required>
-        </div>
-
-        <div class="form-group">
-            <label for="appointment_time">Available Times</label>
-            <select id="appointment_time" name="appointment_time" required disabled>
-                <option value="">Select barber first</option>
-            </select>
-        </div>
-
-        <button type="submit" class="btn btn-primary" id="submitBtn" onclick="this.disabled=true; this.textContent='Booking...'; this.form.submit();">Book Appointment</button>
-    </form>
     {% endif %}
+  </div>
+
+  {% if error %}
+  <div class="bk-error">
+    <span>⚠️ {{ error }}</span>
+    <a href="/client/book/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}">Try again</a>
+  </div>
+  {% endif %}
+
+  <!-- Closed before 11am banner (shown via JS if needed) -->
+  <div id="closedBanner" style="display:none;" class="bk-closed-banner">
+    🕐 Bookings open at <strong>11:00 AM</strong>
+    <div style="font-size:0.85rem;opacity:0.8;margin-top:0.3rem;">Have a VIP code? Enter it below for early access.</div>
+  </div>
+
+  <form method="POST" action="/client/book/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}" id="bookingForm">
+    <input type="hidden" name="client_name" value="{{ client.name or client.phone }}">
+    <input type="hidden" name="client_phone" value="{{ client.phone }}">
+
+    <!-- VIP Code — always visible, fires instantly on input -->
+    <div class="bk-section" id="vipSection">
+      <label class="bk-label">VIP Code <span class="bk-optional">optional</span></label>
+      <div class="bk-vip-row">
+        <input type="text" id="vip_code" name="vip_code"
+               placeholder="e.g. VIPLUCA"
+               value="{{ vip_code or '' }}"
+               autocomplete="off"
+               autocapitalize="characters"
+               style="text-transform:uppercase;"
+               oninput="onVipInput(this.value)">
+        <span id="vipStatus" class="vip-status"></span>
+      </div>
+      <div class="bk-hint">Early access 24h in advance (+€10)</div>
+    </div>
+
+    <!-- Main form body — hidden before 11am unless VIP -->
+    <div id="formBody">
+
+      <!-- Email -->
+      <div class="bk-section">
+        <label class="bk-label">Email <span class="bk-optional">optional — for confirmation</span></label>
+        <input type="email" id="client_email" name="client_email"
+               placeholder="your@email.com"
+               value="{{ client.email or '' }}">
+      </div>
+
+      <!-- Service -->
+      <div class="bk-section">
+        <label class="bk-label">Service</label>
+        <div class="bk-service-grid" id="serviceGrid">
+          {% for service in services %}
+          <div class="bk-service-card" data-service-id="{{ service.id }}" data-price="{{ service.price }}" data-duration="{{ service.duration }}"
+               onclick="selectService(this)">
+            <div class="bk-service-name">{{ service.name }}</div>
+            <div class="bk-service-meta">
+              <span class="bk-service-price" id="svcPrice_{{ service.id }}">
+                €{% if vip_barber %}{{ "%.0f"|format(service.price + vip_barber.early_access_price_add) }}{% else %}{{ "%.0f"|format(service.price) }}{% endif %}
+              </span>
+              <span class="bk-service-dur">{{ service.duration }}min</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="service_id" name="service_id" required>
+      </div>
+
+      <!-- Date (VIP only) -->
+      {% if vip_barber %}
+      <div class="bk-section" id="vipDateSection">
+        <label class="bk-label">Date</label>
+        <div class="bk-toggle-row">
+          <button type="button" class="bk-toggle active" id="btnToday" onclick="setDate('today')">Today</button>
+          <button type="button" class="bk-toggle" id="btnTomorrow" onclick="setDate('tomorrow')">Tomorrow ⭐</button>
+        </div>
+        <input type="hidden" id="appointment_date" name="appointment_date" value="today">
+      </div>
+      {% endif %}
+
+      <!-- Barber -->
+      <div class="bk-section">
+        <label class="bk-label">Barber</label>
+        <div class="bk-barber-grid" id="barberGrid">
+          {% if show_random %}
+          <div class="bk-barber-card" data-barber-id="random" onclick="selectBarber(this)">
+            <div class="bk-barber-avatar bk-random">🎲</div>
+            <div class="bk-barber-name">Random</div>
+          </div>
+          {% endif %}
+          {% for barber in barbers %}
+          <div class="bk-barber-card" data-barber-id="{{ barber.id }}" onclick="selectBarber(this)">
+            <div class="bk-barber-avatar">
+              <img src="/static/photos/{% if location_id == 1 %}mallorca{% else %}concell{% endif %}/{{ barber.name }}.jpg"
+                   alt="{{ barber.name }}"
+                   onerror="if(this.src.endsWith('.jpg')){this.src=this.src.replace('.jpg','.PNG');}else if(this.src.endsWith('.PNG')){this.src='/static/photos/placeholder.svg';this.onerror=null;}">
+            </div>
+            <div class="bk-barber-name">{{ barber.name }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        <input type="hidden" id="barber_id" name="barber_id" required>
+      </div>
+
+      <!-- Time -->
+      <div class="bk-section" id="timeSection" style="display:none;">
+        <label class="bk-label">Time</label>
+        <div class="bk-time-grid" id="timeGrid"></div>
+        <input type="hidden" id="appointment_time" name="appointment_time" required>
+        <div id="timeLoading" class="bk-loading" style="display:none;">Loading available times…</div>
+        <div id="timeEmpty" class="bk-empty" style="display:none;">No available times for this selection.</div>
+      </div>
+
+      <!-- Submit -->
+      <button type="submit" class="bk-submit" id="submitBtn"
+              onclick="return handleSubmit(this)">
+        Confirm Booking
+      </button>
+
+    </div><!-- /formBody -->
+  </form>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <style>
-.client-info-display {
-    background: #2a2a2a;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1.5rem;
-    border-left: 4px solid #fbcc93;
-}
-.client-info-display h3 { color: #fbcc93; margin: 0 0 0.5rem 0; font-size: 1.1rem; }
-.client-info-display p { color: #ccc; margin: 0; font-size: 0.9rem; }
-</style>
-<script>
-function applyVipCode() {
-    const vipCode = document.getElementById('vip_code').value.trim();
-    if (!vipCode) return;
-    const currentUrl = new URL(window.location.href);
-    currentUrl.searchParams.set('vip_code', vipCode);
-    window.location.href = currentUrl.toString();
+/* ===== BOOKING PAGE — CLEAN MINIMAL UI ===== */
+.booking-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
 }
 
-// On page load: if before 11 AM and no valid VIP code, hide form except VIP field
+.bk-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #333;
+}
+.bk-location { font-size: 1rem; font-weight: 600; color: #fbcc93; }
+.bk-user { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; font-size: 0.85rem; color: #aaa; }
+.bk-link { color: #fbcc93; text-decoration: none; font-size: 0.8rem; }
+.bk-link:hover { text-decoration: underline; }
+
+.bk-error {
+  background: #3a1a1a;
+  border: 1px solid #dc3545;
+  color: #ff8080;
+  padding: 0.9rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+}
+.bk-error a { color: #fbcc93; text-decoration: none; font-size: 0.85rem; }
+
+.bk-closed-banner {
+  background: #2a2a2a;
+  border: 1px solid #555;
+  color: #fbcc93;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.bk-section {
+  margin-bottom: 1.5rem;
+}
+.bk-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #888;
+  margin-bottom: 0.6rem;
+}
+.bk-optional { font-weight: 400; text-transform: none; letter-spacing: 0; color: #555; font-size: 0.75rem; }
+.bk-hint { font-size: 0.75rem; color: #555; margin-top: 0.35rem; }
+
+/* VIP row */
+.bk-vip-row { display: flex; align-items: center; gap: 0.5rem; }
+.bk-vip-row input { flex: 1; }
+.vip-status { font-size: 1.2rem; min-width: 1.5rem; text-align: center; }
+
+/* Inputs */
+input[type="email"], input[type="text"] {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  background: #1d1a1c;
+  border: 1.5px solid #333;
+  border-radius: 8px;
+  color: #fbcc93;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+input:focus { outline: none; border-color: #fbcc93; }
+
+/* Service cards */
+.bk-service-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.bk-service-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background: #1d1a1c;
+  border: 1.5px solid #333;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.bk-service-card:hover { border-color: #666; }
+.bk-service-card.selected { border-color: #fbcc93; background: #2a2a2a; }
+.bk-service-name { font-size: 0.95rem; font-weight: 500; color: #fbcc93; }
+.bk-service-meta { display: flex; gap: 0.75rem; align-items: center; }
+.bk-service-price { font-weight: 700; color: #fbcc93; font-size: 0.95rem; }
+.bk-service-dur { font-size: 0.8rem; color: #666; }
+
+/* Date toggle */
+.bk-toggle-row { display: flex; gap: 0.5rem; }
+.bk-toggle {
+  flex: 1;
+  padding: 0.65rem;
+  background: #1d1a1c;
+  border: 1.5px solid #333;
+  border-radius: 8px;
+  color: #888;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.bk-toggle.active { border-color: #fbcc93; color: #fbcc93; background: #2a2a2a; font-weight: 600; }
+
+/* Barber grid */
+.bk-barber-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 0.6rem;
+}
+.bk-barber-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 0.5rem;
+  background: #1d1a1c;
+  border: 1.5px solid #333;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.bk-barber-card:hover { border-color: #666; }
+.bk-barber-card.selected { border-color: #fbcc93; background: #2a2a2a; }
+.bk-barber-avatar {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #2a2a2a;
+  display: flex; align-items: center; justify-content: center;
+}
+.bk-barber-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.bk-random { font-size: 1.8rem; }
+.bk-barber-name { font-size: 0.8rem; font-weight: 600; color: #fbcc93; text-align: center; }
+
+/* Time grid */
+.bk-time-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+.bk-time-btn {
+  padding: 0.65rem 0.25rem;
+  background: #1d1a1c;
+  border: 1.5px solid #333;
+  border-radius: 8px;
+  color: #fbcc93;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.bk-time-btn:hover { border-color: #666; }
+.bk-time-btn.selected { border-color: #fbcc93; background: #2a2a2a; font-weight: 700; }
+
+.bk-loading { color: #666; font-size: 0.9rem; padding: 0.5rem 0; }
+.bk-empty { color: #666; font-size: 0.9rem; padding: 0.5rem 0; }
+
+/* Submit */
+.bk-submit {
+  width: 100%;
+  padding: 1rem;
+  background: #fbcc93;
+  color: #1d1a1c;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  margin-top: 0.5rem;
+}
+.bk-submit:hover { background: #f4b876; }
+.bk-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+
+<script>
+// ── State ──────────────────────────────────────────────
+const VIP_BARBER_ID = {{ vip_barber.id if vip_barber else 'null' }};
+const VIP_EXTRA     = {{ vip_barber.early_access_price_add if vip_barber else 0 }};
+let vipDebounce = null;
+
+// ── Before-11am gate ───────────────────────────────────
 (function() {
-    const form = document.getElementById('bookingForm');
-    if (!form) return;
-    const vipCode = document.getElementById('vip_code')?.value || '';
-    const hasValidVipCode = vipCode.trim().toUpperCase().startsWith('VIP') && vipCode.trim().length > 3;
-    if (!hasValidVipCode && new Date().getHours() < 11) {
-        form.querySelectorAll('.form-group:not(:has(#vip_code)), .barber-list, .client-info-display, button[type="submit"]')
-            .forEach(el => el.style.display = 'none');
-        const vipGroup = document.getElementById('vip_code').closest('.form-group');
-        const msg = document.createElement('div');
-        msg.style.cssText = 'background:#2a2a2a;color:#fbcc93;padding:1.5rem;border-radius:8px;text-align:center;margin-bottom:1rem;font-size:1rem;';
-        msg.innerHTML = '🕐 Bookings open at <strong>11:00 AM</strong>.<br><small style="opacity:0.8">Have a VIP code? Enter it below for early access.</small>';
-        vipGroup.parentNode.insertBefore(msg, vipGroup);
-    }
+  const vipCode = document.getElementById('vip_code').value.trim();
+  const hasVip  = vipCode.toUpperCase().startsWith('VIP') && vipCode.length > 3;
+  if (!hasVip && new Date().getHours() < 11) {
+    document.getElementById('formBody').style.display = 'none';
+    document.getElementById('closedBanner').style.display = 'block';
+  }
 })();
 
-function updateAvailableTimes() {
-    const vipCode = document.getElementById('vip_code')?.value || '';
-    const hasValidVipCode = vipCode.trim().toUpperCase().startsWith('VIP') && vipCode.trim().length > 3;
-    const timeSelect = document.getElementById('appointment_time');
+// ── VIP code: fires instantly as user types ────────────
+function onVipInput(raw) {
+  clearTimeout(vipDebounce);
+  const val = raw.trim().toUpperCase();
+  const status = document.getElementById('vipStatus');
 
-    if (!hasValidVipCode && new Date().getHours() < 11) {
-        timeSelect.innerHTML = '<option value="">Bookings open at 11:00 AM</option>';
-        timeSelect.disabled = true;
-        return;
-    }
+  if (!val || val.length <= 3 || !val.startsWith('VIP')) {
+    status.textContent = '';
+    return;
+  }
 
-    const barberId = document.getElementById('barber_id').value;
-    const serviceId = document.getElementById('service_id').value;
-    const dateSelector = document.getElementById('appointment_date');
-    const dateSelection = dateSelector ? dateSelector.value : 'today';
-
-    if (!barberId || !serviceId) {
-        timeSelect.innerHTML = '<option value="">Select service and barber first</option>';
-        timeSelect.disabled = true;
-        return;
-    }
-
-    timeSelect.innerHTML = '<option value="">Loading times...</option>';
-    timeSelect.disabled = true;
-
-    const targetDate = new Date();
-    if (dateSelection === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
-    const dateStr = targetDate.toISOString().split('T')[0];
-
-    const fetchTimes = (bid) =>
-        fetch(`/api/available-times/${bid}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSelection}&t=${Date.now()}`)
-            .then(r => r.json()).catch(() => []);
-
-    if (barberId === 'random') {
-        const barberItems = document.querySelectorAll('.barber-item[data-barber-id]:not([data-barber-id="random"])');
-        if (barberItems.length === 0) return;
-        Promise.all(Array.from(barberItems).map(item => fetchTimes(item.getAttribute('data-barber-id'))))
-            .then(results => {
-                const allTimes = [...new Set(results.flat())].sort();
-                timeSelect.innerHTML = allTimes.length ? '<option value="">Select a time</option>' : '<option value="">No times available</option>';
-                allTimes.forEach(time => { timeSelect.innerHTML += `<option value="${dateStr}T${time}:00">${time}</option>`; });
-                timeSelect.disabled = false;
-            });
-    } else {
-        fetchTimes(barberId).then(times => {
-            timeSelect.innerHTML = times.length ? '<option value="">Select a time</option>' : '<option value="">No times available</option>';
-            times.forEach(time => { timeSelect.innerHTML += `<option value="${dateStr}T${time}:00">${time}</option>`; });
-            timeSelect.disabled = false;
-        });
-    }
+  status.textContent = '⏳';
+  vipDebounce = setTimeout(() => {
+    const url = new URL(window.location.href);
+    url.searchParams.set('vip_code', val);
+    window.location.href = url.toString();
+  }, 600); // 600ms after user stops typing
 }
 
-document.querySelectorAll('.barber-item').forEach(item => {
-    item.addEventListener('click', function() {
-        document.querySelectorAll('.barber-item').forEach(i => i.classList.remove('selected'));
-        this.classList.add('selected');
-        document.getElementById('barber_id').value = this.getAttribute('data-barber-id');
-        updateAvailableTimes();
+// ── Service selection ──────────────────────────────────
+function selectService(card) {
+  document.querySelectorAll('.bk-service-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  document.getElementById('service_id').value = card.dataset.serviceId;
+  refreshTimes();
+}
+
+// ── Date toggle (VIP only) ─────────────────────────────
+function setDate(val) {
+  document.getElementById('appointment_date').value = val;
+  document.getElementById('btnToday').classList.toggle('active', val === 'today');
+  document.getElementById('btnTomorrow').classList.toggle('active', val === 'tomorrow');
+  clearTime();
+  refreshTimes();
+}
+
+// ── Barber selection ───────────────────────────────────
+function selectBarber(card) {
+  document.querySelectorAll('.bk-barber-card').forEach(c => c.classList.remove('selected'));
+  card.classList.add('selected');
+  document.getElementById('barber_id').value = card.dataset.barberId;
+  clearTime();
+  refreshTimes();
+}
+
+// ── Time slot rendering ────────────────────────────────
+function clearTime() {
+  document.getElementById('appointment_time').value = '';
+  document.getElementById('timeGrid').innerHTML = '';
+  document.getElementById('timeSection').style.display = 'none';
+  document.getElementById('timeEmpty').style.display = 'none';
+}
+
+function refreshTimes() {
+  const barberId  = document.getElementById('barber_id').value;
+  const serviceId = document.getElementById('service_id').value;
+  if (!barberId || !serviceId) return;
+
+  const vipCode = document.getElementById('vip_code').value.trim();
+  const dateEl  = document.getElementById('appointment_date');
+  const dateSel = dateEl ? dateEl.value : 'today';
+
+  const targetDate = new Date();
+  if (dateSel === 'tomorrow') targetDate.setDate(targetDate.getDate() + 1);
+  const dateStr = targetDate.toISOString().split('T')[0];
+
+  const timeSection = document.getElementById('timeSection');
+  const timeGrid    = document.getElementById('timeGrid');
+  const loading     = document.getElementById('timeLoading');
+  const empty       = document.getElementById('timeEmpty');
+
+  timeSection.style.display = 'block';
+  timeGrid.innerHTML = '';
+  loading.style.display = 'block';
+  empty.style.display = 'none';
+  document.getElementById('appointment_time').value = '';
+
+  const fetchTimes = (bid) =>
+    fetch(`/api/available-times/${bid}/${serviceId}?vip_code=${encodeURIComponent(vipCode)}&date_selection=${dateSel}&t=${Date.now()}`)
+      .then(r => r.json()).catch(() => []);
+
+  const render = (times) => {
+    loading.style.display = 'none';
+    if (!times.length) { empty.style.display = 'block'; return; }
+    times.forEach(t => {
+      const btn = document.createElement('div');
+      btn.className = 'bk-time-btn';
+      btn.textContent = t;
+      btn.onclick = () => {
+        document.querySelectorAll('.bk-time-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        document.getElementById('appointment_time').value = `${dateStr}T${t}:00`;
+      };
+      timeGrid.appendChild(btn);
     });
-});
+  };
 
-document.getElementById('service_id')?.addEventListener('change', updateAvailableTimes);
+  if (barberId === 'random') {
+    const cards = document.querySelectorAll('.bk-barber-card[data-barber-id]:not([data-barber-id="random"])');
+    Promise.all(Array.from(cards).map(c => fetchTimes(c.dataset.barberId)))
+      .then(results => render([...new Set(results.flat())].sort()));
+  } else {
+    fetchTimes(barberId).then(render);
+  }
+}
 
+// ── Submit guard ───────────────────────────────────────
+function handleSubmit(btn) {
+  if (!document.getElementById('service_id').value) {
+    alert('Please select a service.');
+    return false;
+  }
+  if (!document.getElementById('barber_id').value) {
+    alert('Please select a barber.');
+    return false;
+  }
+  if (!document.getElementById('appointment_time').value) {
+    alert('Please select a time slot.');
+    return false;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Booking…';
+  return true;
+}
+
+// ── Auto-select VIP barber on load ─────────────────────
 {% if vip_barber %}
 (function() {
-    const barberItem = document.querySelector('.barber-item[data-barber-id="{{ vip_barber.id }}"]');
-    if (barberItem) {
-        barberItem.classList.add('selected');
-        document.getElementById('barber_id').value = '{{ vip_barber.id }}';
-        if (document.getElementById('service_id').value) updateAvailableTimes();
-    }
+  const card = document.querySelector('.bk-barber-card[data-barber-id="{{ vip_barber.id }}"]');
+  if (card) {
+    card.classList.add('selected');
+    document.getElementById('barber_id').value = '{{ vip_barber.id }}';
+  }
 })();
 {% endif %}
 </script>

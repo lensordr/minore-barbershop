@@ -56,7 +56,7 @@
         <div class="grid-header">
             <div class="time-header">Time</div>
             {% for barber in all_barbers %}
-            <div class="barber-header{% if not barber.active %} inactive{% endif %}">{{ barber.name }}{% if not barber.active %} (Closed){% endif %}</div>
+            <div class="barber-header{% if not barber.active %} inactive{% endif %}" data-barber-id="{{ barber.id }}" data-vip-extra="{{ barber.early_access_price_add or 0 }}">{{ barber.name }}{% if not barber.active %} (Closed){% endif %}</div>
             {% endfor %}
         </div>
         
@@ -130,8 +130,9 @@
                 <span id="selectedBarber"></span>
             </div>
             <div class="form-group">
-                <label>Time:</label>
+                <label>Date &amp; Time:</label>
                 <span id="selectedTime"></span>
+                <span id="selectedDateLabel" style="margin-left:0.5rem; font-size:0.85rem; color:#fbcc93; font-weight:bold;"></span>
             </div>
             <div class="form-group">
                 <label for="quickClientPhone">Phone Number:</label>
@@ -276,11 +277,25 @@ function openQuickBooking(slot) {
     document.getElementById('selectedTime').textContent = time;
     document.getElementById('quickBarberId').value = barberId;
     
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('quickAppointmentTime').value = `${today}T${time}:00`;
+    // Store VIP extra for this barber (read from barber header data attribute)
+    const barberHeader = document.querySelector(`.barber-header[data-barber-id="${barberId}"]`);
+    const vipExtra = barberHeader ? parseFloat(barberHeader.dataset.vipExtra || 0) : 0;
+    document.getElementById('quickBarberId').dataset.vipExtra = vipExtra;
+    
+    // Use the currently selected date (today or tomorrow)
+    const isTomorrow = document.getElementById('dateSelect').value === 'tomorrow';
+    const targetDate = new Date();
+    if (isTomorrow) targetDate.setDate(targetDate.getDate() + 1);
+    const dateStr = targetDate.toISOString().split('T')[0];
+    
+    document.getElementById('quickAppointmentTime').value = `${dateStr}T${time}:00`;
+    document.getElementById('selectedDateLabel').textContent = isTomorrow ? `(Tomorrow — VIP +€${vipExtra})` : '(Today)';
     
     // Reset form state
     document.getElementById('existingClientInfo').style.display = 'none';
+    document.getElementById('quickService').value = '';
+    document.getElementById('quickPrice').value = '';
+    document.getElementById('quickDuration').value = '30';
     
     document.getElementById('quickBookingModal').style.display = 'block';
     document.getElementById('quickClientName').focus();
@@ -302,16 +317,32 @@ window.onclick = function(event) {
 }
 
 // Update duration and price when service is selected
+// When viewing tomorrow (VIP day), add the VIP extra price per barber
 function updateServiceDuration() {
     const serviceSelect = document.getElementById('quickService');
     const selectedOption = serviceSelect.options[serviceSelect.selectedIndex];
     
     if (selectedOption.value) {
         const duration = selectedOption.getAttribute('data-duration');
-        const price = selectedOption.getAttribute('data-price');
+        const basePrice = parseFloat(selectedOption.getAttribute('data-price'));
+        
+        // Check if we're booking for tomorrow (VIP day) and get barber's VIP extra
+        const isTomorrow = document.getElementById('dateSelect').value === 'tomorrow';
+        let finalPrice = basePrice;
+        if (isTomorrow) {
+            const barberId = document.getElementById('quickBarberId').value;
+            // Fetch barber VIP extra price from the barber list in the page
+            const barberOption = document.querySelector(`#mobileBarberSelect option[value="${barberId}"]`);
+            // We store VIP extra as data attribute on the service options per barber — 
+            // simplest approach: add a fixed VIP_EXTRA from the page context
+            // The VIP extra is €10 by default (early_access_price_add)
+            // We read it from the barber header data if available, else default 10
+            const vipExtra = parseFloat(document.getElementById('quickBarberId').dataset.vipExtra || 0);
+            finalPrice = basePrice + vipExtra;
+        }
         
         document.getElementById('quickDuration').value = duration;
-        document.getElementById('quickPrice').value = price;
+        document.getElementById('quickPrice').value = finalPrice.toFixed(2);
     }
 }
 

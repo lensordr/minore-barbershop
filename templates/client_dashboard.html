@@ -1,285 +1,205 @@
 {% extends "base.html" %}
 
-{% block title %}My Appointments - MINORE BARBERSHOP{% endblock %}
+{% block title %}My Appointments - MINORE{% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
-    <div class="dashboard-header">
-        <h2>Welcome, {{ client.name or "Customer" }}</h2>
-        <p>Phone: {{ client.phone }}</p>
-        <div class="dashboard-actions">
-            <a href="/client/book/mallorca" class="btn btn-primary">Book Mallorca</a>
-            <a href="/client/book/concell" class="btn btn-primary">Book Consell</a>
-            <a href="/client/logout" class="btn btn-secondary">Logout</a>
-        </div>
+<div class="dash-wrap">
+
+  <div class="dash-header">
+    <div>
+      <div class="dash-name">{{ client.name or "Hey there" }}</div>
+      <div class="dash-phone">{{ client.phone }}</div>
     </div>
+    <a href="/client/logout" class="dash-logout">Logout</a>
+  </div>
 
-    <div class="appointments-section">
-        <div class="appointments-header">
-            <h3>Your Appointments</h3>
-            <div class="appointment-filters">
-                <button onclick="showUpcoming()" class="filter-btn active" id="upcomingBtn">This Month</button>
-                <button onclick="showPast()" class="filter-btn" id="pastBtn">Past Appointments</button>
-            </div>
-        </div>
-        
-        {% if upcoming_appointments %}
-        <div class="appointments-list" id="upcomingList">
-            {% for appointment in upcoming_appointments %}
-            <div class="appointment-card upcoming">
-                <div class="appointment-info">
-                    <div class="appointment-time">
-                        <strong>{{ appointment.appointment_time.strftime('%B %d, %Y at %H:%M') }}</strong>
-                    </div>
-                    <div class="appointment-details">
-                        <span class="service">{{ appointment.service.name }}</span>
-                        <span class="barber">with {{ appointment.barber.name }}</span>
-                        <span class="location">{{ location }}</span>
-                    </div>
-                    <div class="appointment-price">€{{ appointment.custom_price or appointment.service.price }}</div>
-                </div>
-                {% if appointment.status == 'scheduled' %}
-                <div class="appointment-actions">
-                    <button onclick="cancelAppointment({{ appointment.id }})" class="btn btn-cancel">Cancel</button>
-                </div>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+  <div class="dash-book-row">
+    <a href="/client/book/mallorca" class="dash-book-btn">+ Mallorca</a>
+    <a href="/client/book/concell" class="dash-book-btn">+ Consell</a>
+  </div>
 
-        {% if past_appointments %}
-        <div class="appointments-list" id="pastList" style="display: none;">
-            {% for appointment in past_appointments %}
-            <div class="appointment-card past">
-                <div class="appointment-info">
-                    <div class="appointment-time">
-                        {{ appointment.appointment_time.strftime('%B %d, %Y at %H:%M') }}
-                    </div>
-                    <div class="appointment-details">
-                        <span class="service">{{ appointment.service.name }}</span>
-                        <span class="barber">with {{ appointment.barber.name }}</span>
-                        <span class="status status-{{ appointment.status }}">{{ appointment.status.title() }}</span>
-                    </div>
-                    <div class="appointment-price">€{{ appointment.custom_price or appointment.service.price }}</div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
+  <div class="dash-tabs">
+    <button class="dash-tab active" id="tabUpcoming" onclick="showTab('upcoming')">Upcoming</button>
+    <button class="dash-tab" id="tabPast" onclick="showTab('past')">Past</button>
+  </div>
 
-        {% if not upcoming_appointments and not past_appointments %}
-        <div class="no-appointments">
-            <p>You don't have any appointments yet.</p>
-            <div style="display: flex; gap: 1rem; justify-content: center; margin-top: 1rem;">
-                <a href="/client/book/mallorca" class="btn btn-primary">Book Mallorca</a>
-                <a href="/client/book/concell" class="btn btn-primary">Book Consell</a>
-            </div>
+  <!-- Upcoming -->
+  <div id="listUpcoming">
+    {% if upcoming_appointments %}
+      {% for apt in upcoming_appointments %}
+      <div class="apt-card apt-upcoming">
+        <div class="apt-main">
+          <div class="apt-time">{{ apt.appointment_time.strftime('%a %d %b · %H:%M') }}</div>
+          <div class="apt-detail">{{ apt.service.name }} · {{ apt.barber.name }}</div>
+          <div class="apt-loc">{{ location }}</div>
         </div>
-        {% endif %}
-    </div>
+        <div class="apt-right">
+          <div class="apt-price">€{{ apt.custom_price or apt.service.price }}</div>
+          {% if apt.status == 'scheduled' %}
+          <button class="apt-cancel" onclick="cancelApt({{ apt.id }}, this)">Cancel</button>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="dash-empty">
+        <div>No upcoming appointments.</div>
+        <div style="margin-top:0.5rem;font-size:0.85rem;color:#555;">Book one above ↑</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Past -->
+  <div id="listPast" style="display:none;">
+    {% if past_appointments %}
+      {% for apt in past_appointments %}
+      <div class="apt-card apt-past">
+        <div class="apt-main">
+          <div class="apt-time">{{ apt.appointment_time.strftime('%a %d %b · %H:%M') }}</div>
+          <div class="apt-detail">{{ apt.service.name }} · {{ apt.barber.name }}</div>
+        </div>
+        <div class="apt-right">
+          <div class="apt-price">€{{ apt.custom_price or apt.service.price }}</div>
+          <div class="apt-status apt-status-{{ apt.status }}">{{ apt.status.title() }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="dash-empty">No past appointments.</div>
+    {% endif %}
+  </div>
+
 </div>
 
 <style>
-.dashboard-container {
-    max-width: 800px;
-    margin: 2rem auto;
-    padding: 2rem;
+.dash-wrap {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 1rem 1rem 3rem;
 }
-
-.dashboard-header {
-    background: #2a2a2a;
-    padding: 2rem;
-    border-radius: 8px;
-    margin-bottom: 2rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.dash-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #333;
 }
-
-.dashboard-header h2 {
-    color: #fbcc93;
-    margin: 0;
+.dash-name { font-size: 1.1rem; font-weight: 700; color: #fbcc93; }
+.dash-phone { font-size: 0.8rem; color: #666; margin-top: 0.15rem; }
+.dash-logout {
+  font-size: 0.8rem;
+  color: #666;
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  transition: border-color 0.15s, color 0.15s;
 }
+.dash-logout:hover { border-color: #666; color: #aaa; }
 
-.dashboard-header p {
-    color: #999;
-    margin: 0.5rem 0 0 0;
+.dash-book-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1.5rem;
 }
-
-.dashboard-actions {
-    display: flex;
-    gap: 1rem;
+.dash-book-btn {
+  flex: 1;
+  display: block;
+  text-align: center;
+  padding: 0.8rem;
+  background: #fbcc93;
+  color: #1d1a1c;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: background 0.15s;
 }
+.dash-book-btn:hover { background: #f4b876; }
 
-.appointments-section h3 {
-    color: #fbcc93;
-    margin-bottom: 1.5rem;
+.dash-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #333;
 }
-
-.appointments-section h4 {
-    color: #fbcc93;
-    margin: 2rem 0 1rem 0;
-    font-size: 1.2rem;
+.dash-tab {
+  padding: 0.6rem 1.25rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #666;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  margin-bottom: -1px;
 }
+.dash-tab.active { color: #fbcc93; border-bottom-color: #fbcc93; }
 
-.appointment-card {
-    background: #2a2a2a;
-    border-radius: 8px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.apt-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: #2a2a2a;
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+  border-left: 3px solid transparent;
 }
+.apt-upcoming { border-left-color: #fbcc93; }
+.apt-past { border-left-color: #444; opacity: 0.75; }
 
-.appointment-card.upcoming {
-    border-left: 4px solid #28a745;
+.apt-time { font-size: 0.95rem; font-weight: 600; color: #fbcc93; margin-bottom: 0.25rem; }
+.apt-detail { font-size: 0.85rem; color: #aaa; margin-bottom: 0.15rem; }
+.apt-loc { font-size: 0.75rem; color: #666; }
+
+.apt-right { display: flex; flex-direction: column; align-items: flex-end; gap: 0.4rem; }
+.apt-price { font-weight: 700; color: #fbcc93; font-size: 0.95rem; }
+.apt-cancel {
+  font-size: 0.75rem;
+  color: #dc3545;
+  background: none;
+  border: 1px solid #dc3545;
+  border-radius: 5px;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
+.apt-cancel:hover { background: #dc3545; color: white; }
+.apt-status { font-size: 0.75rem; }
+.apt-status-completed { color: #28a745; }
+.apt-status-cancelled { color: #dc3545; }
+.apt-status-scheduled { color: #ffc107; }
 
-.appointment-card.past {
-    border-left: 4px solid #6c757d;
-    opacity: 0.8;
-}
-
-.appointment-info {
-    flex: 1;
-}
-
-.appointment-time {
-    color: #fbcc93;
-    font-size: 1.1rem;
-    margin-bottom: 0.5rem;
-}
-
-.appointment-details {
-    display: flex;
-    gap: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-.appointment-details span {
-    color: #ccc;
-    font-size: 0.9rem;
-}
-
-.appointment-price {
-    color: #fbcc93;
-    font-weight: bold;
-    font-size: 1.1rem;
-}
-
-.status-completed {
-    color: #28a745;
-}
-
-.status-cancelled {
-    color: #dc3545;
-}
-
-.status-scheduled {
-    color: #ffc107;
-}
-
-.no-appointments {
-    text-align: center;
-    padding: 3rem;
-    background: #2a2a2a;
-    border-radius: 8px;
-}
-
-.no-appointments p {
-    color: #999;
-    margin-bottom: 1.5rem;
-}
-
-.appointments-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.5rem;
-}
-
-.appointment-filters {
-    display: flex;
-    gap: 0.5rem;
-}
-
-.filter-btn {
-    padding: 0.5rem 1rem;
-    background: #444;
-    color: #ccc;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.filter-btn.active {
-    background: #fbcc93;
-    color: #1d1a1c;
-}
-
-.filter-btn:hover {
-    background: #555;
-}
-
-.filter-btn.active:hover {
-    background: #f4b876;
-}
-
-@media (max-width: 768px) {
-    .dashboard-header {
-        flex-direction: column;
-        text-align: center;
-        gap: 1rem;
-    }
-    
-    .appointment-card {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 1rem;
-    }
-    
-    .appointment-details {
-        flex-direction: column;
-        gap: 0.25rem;
-    }
+.dash-empty {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: #666;
+  font-size: 0.9rem;
 }
 </style>
 
 <script>
-function cancelAppointment(appointmentId) {
-    if (confirm('Are you sure you want to cancel this appointment?')) {
-        fetch(`/client/cancel-appointment/${appointmentId}`, {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                location.reload();
-            } else {
-                alert('Error cancelling appointment: ' + data.message);
-            }
-        })
-        .catch(error => {
-            alert('Error cancelling appointment');
-        });
-    }
+function showTab(tab) {
+  document.getElementById('listUpcoming').style.display = tab === 'upcoming' ? 'block' : 'none';
+  document.getElementById('listPast').style.display     = tab === 'past'     ? 'block' : 'none';
+  document.getElementById('tabUpcoming').classList.toggle('active', tab === 'upcoming');
+  document.getElementById('tabPast').classList.toggle('active', tab === 'past');
 }
 
-function showUpcoming() {
-    document.getElementById('upcomingList').style.display = 'block';
-    document.getElementById('pastList').style.display = 'none';
-    document.getElementById('upcomingBtn').classList.add('active');
-    document.getElementById('pastBtn').classList.remove('active');
-}
-
-function showPast() {
-    document.getElementById('upcomingList').style.display = 'none';
-    document.getElementById('pastList').style.display = 'block';
-    document.getElementById('upcomingBtn').classList.remove('active');
-    document.getElementById('pastBtn').classList.add('active');
+function cancelApt(id, btn) {
+  if (!confirm('Cancel this appointment?')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  fetch(`/client/cancel-appointment/${id}`, { method: 'POST' })
+    .then(r => r.json())
+    .then(d => {
+      if (d.success) location.reload();
+      else { alert(d.message); btn.disabled = false; btn.textContent = 'Cancel'; }
+    })
+    .catch(() => { alert('Error cancelling'); btn.disabled = false; btn.textContent = 'Cancel'; });
 }
 </script>
 {% endblock %}
