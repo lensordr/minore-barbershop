@@ -126,8 +126,7 @@
       </div>
 
       <!-- Submit -->
-      <button type="submit" class="bk-submit" id="submitBtn"
-              onclick="return handleSubmit(this)">
+      <button type="submit" class="bk-submit" id="submitBtn">
         Confirm Booking
       </button>
 
@@ -451,23 +450,27 @@ function refreshTimes() {
 }
 
 // ── Submit guard ───────────────────────────────────────
-function handleSubmit(btn) {
+document.getElementById('bookingForm').addEventListener('submit', function(e) {
   if (!document.getElementById('service_id').value) {
+    e.preventDefault();
     alert('Please select a service.');
-    return false;
+    return;
   }
   if (!document.getElementById('barber_id').value) {
+    e.preventDefault();
     alert('Please select a barber.');
-    return false;
+    return;
   }
   if (!document.getElementById('appointment_time').value) {
+    e.preventDefault();
     alert('Please select a time slot.');
-    return false;
+    return;
   }
+  // All good — let the form submit, then disable button to prevent double-click
+  const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = 'Booking…';
-  return true;
-}
+});
 
 // ── Auto-select VIP barber on load ─────────────────────
 {% if vip_barber %}
