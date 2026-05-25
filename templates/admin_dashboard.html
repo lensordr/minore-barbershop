@@ -464,58 +464,64 @@ function loadAvailableTimesForEdit() {
     const barberId = document.getElementById('editBarber').value;
     const serviceId = document.getElementById('editServiceId').value;
     const timeSelect = document.getElementById('editTime');
+    const normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
+    
+    // Generate all possible 30-min slots as fallback
+    function generateAllSlots() {
+        const slots = [];
+        for (let h = 11; h < 19; h++) {
+            slots.push(String(h).padStart(2,'0') + ':00');
+            slots.push(String(h).padStart(2,'0') + ':30');
+        }
+        return slots;
+    }
+    
+    function populateSelect(times) {
+        timeSelect.innerHTML = '';
+        let hasCurrentTime = false;
+        
+        times.forEach(time => {
+            const option = document.createElement('option');
+            option.value = time;
+            option.textContent = time;
+            timeSelect.appendChild(option);
+            if (time === normalizedTime) hasCurrentTime = true;
+        });
+        
+        // Always include current time
+        if (normalizedTime && !hasCurrentTime) {
+            const option = document.createElement('option');
+            option.value = normalizedTime;
+            option.textContent = normalizedTime + ' (current)';
+            timeSelect.insertBefore(option, timeSelect.firstChild);
+        }
+        
+        if (normalizedTime) timeSelect.value = normalizedTime;
+    }
     
     if (!barberId || !serviceId) {
-        // If no service_id yet, just show the current time
-        timeSelect.innerHTML = '';
-        if (window.currentEditTime) {
-            const t = window.currentEditTime.substring(0, 5);
-            const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
-            timeSelect.appendChild(opt);
-            timeSelect.value = t;
-        }
+        // No service yet — show all slots so admin can still pick a time
+        populateSelect(generateAllSlots());
         return;
     }
     
     timeSelect.innerHTML = '<option value="">Loading...</option>';
     
-    // admin=1 returns all day slots (not just future ones) so admin can reschedule freely
     const dateSelection = document.getElementById('dateSelect')?.value || 'today';
     fetch(`/api/available-times/${barberId}/${serviceId}?date_selection=${dateSelection}&admin=1&t=${Date.now()}`)
         .then(response => response.json())
         .then(times => {
-            timeSelect.innerHTML = '';
-            
-            // Always include the current appointment time in the list
-            const normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
-            let hasCurrentTime = false;
-            
-            times.forEach(time => {
-                const option = document.createElement('option');
-                option.value = time;
-                option.textContent = time;
-                timeSelect.appendChild(option);
-                if (time === normalizedTime) hasCurrentTime = true;
-            });
-            
-            // If current time wasn't in the available list, add it (it's the appointment's own slot)
-            if (normalizedTime && !hasCurrentTime) {
-                const option = document.createElement('option');
-                option.value = normalizedTime;
-                option.textContent = normalizedTime + ' (current)';
-                timeSelect.insertBefore(option, timeSelect.firstChild);
-            }
-            
-            // Set current time
-            if (normalizedTime) {
-                timeSelect.value = normalizedTime;
+            if (!times || !times.length) {
+                // API returned empty — use all slots as fallback for admin
+                populateSelect(generateAllSlots());
+            } else {
+                populateSelect(times);
             }
         })
         .catch(error => {
             console.error('Error loading times:', error);
-            timeSelect.innerHTML = '<option value="">Error loading times</option>';
+            // On error, show all slots so admin isn't blocked
+            populateSelect(generateAllSlots());
         });
 }
 
