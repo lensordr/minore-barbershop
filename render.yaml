@@ -2,8 +2,8 @@ services:
   - type: web
     name: minore-barbershop
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install -r requirements.txt && tar czf /tmp/app_source.tar.gz --exclude='.git' --exclude='data' --exclude='*.pyc' --exclude='__pycache__' .
+    startCommand: tar xzf /tmp/app_source.tar.gz -C /opt/render/project/src/ && uvicorn main:app --host 0.0.0.0 --port $PORT
     disk:
       name: barbershop-data
       mountPath: /opt/render/project/src
