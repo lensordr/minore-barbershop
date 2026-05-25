@@ -465,7 +465,19 @@ function loadAvailableTimesForEdit() {
     const serviceId = document.getElementById('editServiceId').value;
     const timeSelect = document.getElementById('editTime');
     
-    if (!barberId || !serviceId) return;
+    if (!barberId || !serviceId) {
+        // If no service_id yet, just show the current time
+        timeSelect.innerHTML = '';
+        if (window.currentEditTime) {
+            const t = window.currentEditTime.substring(0, 5);
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            timeSelect.appendChild(opt);
+            timeSelect.value = t;
+        }
+        return;
+    }
     
     timeSelect.innerHTML = '<option value="">Loading...</option>';
     

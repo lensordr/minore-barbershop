@@ -652,8 +652,9 @@ def get_all_day_times_for_service(
     if schedule is None:
         schedule = get_schedule(db)
 
-    if not schedule.is_open:
-        return []
+    # For admin, always return slots even if schedule is "closed"
+    start_hour = schedule.start_hour if schedule else 11
+    end_hour = schedule.end_hour if schedule else 19
 
     service_duration = (
         db.query(models.Service.duration)
@@ -661,16 +662,14 @@ def get_all_day_times_for_service(
         .scalar()
     )
     if not service_duration:
-        return []
+        service_duration = 30  # fallback to 30 min if service not found
 
     target_date = today + timedelta(days=1) if use_tomorrow else today
 
     start_time = datetime.combine(
-        target_date, datetime.min.time().replace(hour=schedule.start_hour)
+        target_date, datetime.min.time().replace(hour=start_hour)
     )
-    end_time = datetime.combine(
-        target_date, datetime.min.time().replace(hour=schedule.end_hour)
-    )
+    end_time = datetime.combine(target_date, datetime.min.time().replace(hour=end_hour))
 
     # Fetch existing appointments for conflict check
     existing_appointments = (
@@ -683,7 +682,7 @@ def get_all_day_times_for_service(
         .filter(
             models.Appointment.barber_id == barber_id,
             models.Appointment.appointment_time >= start_time,
-            models.Appointment.appointment_time <= end_time,
+            models.Appointment.appointment_time < end_time,
             models.Appointment.status != "cancelled",
         )
         .all()
