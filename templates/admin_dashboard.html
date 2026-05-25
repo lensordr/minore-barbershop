@@ -213,22 +213,7 @@
             <div class="form-group">
                 <label for="editTime">Time:</label>
                 <select id="editTime" name="time" required>
-                    <option value="11:00">11:00</option>
-                    <option value="11:30">11:30</option>
-                    <option value="12:00">12:00</option>
-                    <option value="12:30">12:30</option>
-                    <option value="13:00">13:00</option>
-                    <option value="13:30">13:30</option>
-                    <option value="14:00">14:00</option>
-                    <option value="14:30">14:30</option>
-                    <option value="15:00">15:00</option>
-                    <option value="15:30">15:30</option>
-                    <option value="16:00">16:00</option>
-                    <option value="16:30">16:30</option>
-                    <option value="17:00">17:00</option>
-                    <option value="17:30">17:30</option>
-                    <option value="18:00">18:00</option>
-                    <option value="18:30">18:30</option>
+                    <option value="">Loading...</option>
                 </select>
             </div>
             <input type="hidden" id="editServiceId" name="service_id">
@@ -410,18 +395,15 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
     document.getElementById('editDuration').value = duration;
     document.getElementById('editBarber').value = barberId;
     
-    // Set current time on the pre-populated select
     window.currentEditTime = time;
-    var normalizedTime = time ? time.substring(0, 5) : '';
-    if (normalizedTime) {
-        document.getElementById('editTime').value = normalizedTime;
-    }
     
-    // Fetch phone info (non-blocking)
+    // Fetch service_id then load available times
     fetch('/api/appointment-details/' + id)
         .then(function(response) { return response.json(); })
         .then(function(data) {
             document.getElementById('editServiceId').value = data.service_id;
+            loadAvailableTimesForEdit();
+            
             var phoneGroup = document.getElementById('editPhoneGroup');
             var phoneSpan = document.getElementById('editClientPhone');
             if (data.phone && data.phone.trim()) {
@@ -433,6 +415,8 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
         })
         .catch(function() {
             document.getElementById('editPhoneGroup').style.display = 'none';
+            // Still load times even if details fetch fails
+            loadAvailableTimesForEdit();
         });
     
     // Show/hide action buttons based on status
@@ -477,11 +461,62 @@ function submitEditAppointment(event) {
 }
 
 function loadAvailableTimesForEdit() {
-    // Options are hardcoded in HTML — just reset selection to current time
+    var barberId = document.getElementById('editBarber').value;
+    var serviceId = document.getElementById('editServiceId').value;
+    var timeSelect = document.getElementById('editTime');
     var normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
-    if (normalizedTime) {
-        document.getElementById('editTime').value = normalizedTime;
+    var dateSelection = document.getElementById('dateSelect') ? document.getElementById('dateSelect').value : 'today';
+    
+    if (!barberId || !serviceId) {
+        // No service yet — just show current time
+        timeSelect.innerHTML = '';
+        if (normalizedTime) {
+            var opt = document.createElement('option');
+            opt.value = normalizedTime;
+            opt.textContent = normalizedTime;
+            timeSelect.appendChild(opt);
+        }
+        return;
     }
+    
+    timeSelect.innerHTML = '<option value="">Loading...</option>';
+    
+    fetch('/api/available-times/' + barberId + '/' + serviceId + '?date_selection=' + dateSelection + '&admin=1&t=' + Date.now())
+        .then(function(response) { return response.json(); })
+        .then(function(times) {
+            timeSelect.innerHTML = '';
+            var hasCurrentTime = false;
+            
+            if (times && times.length) {
+                times.forEach(function(time) {
+                    var opt = document.createElement('option');
+                    opt.value = time;
+                    opt.textContent = time;
+                    timeSelect.appendChild(opt);
+                    if (time === normalizedTime) hasCurrentTime = true;
+                });
+            }
+            
+            // Always include current appointment time
+            if (normalizedTime && !hasCurrentTime) {
+                var opt = document.createElement('option');
+                opt.value = normalizedTime;
+                opt.textContent = normalizedTime + ' (current)';
+                timeSelect.insertBefore(opt, timeSelect.firstChild);
+            }
+            
+            if (normalizedTime) timeSelect.value = normalizedTime;
+        })
+        .catch(function() {
+            // On error, just show current time
+            timeSelect.innerHTML = '';
+            if (normalizedTime) {
+                var opt = document.createElement('option');
+                opt.value = normalizedTime;
+                opt.textContent = normalizedTime;
+                timeSelect.appendChild(opt);
+            }
+        });
 }
 
 function completeAppointment() {
@@ -607,36 +642,4 @@ if (window.innerWidth <= 768) {
     }
 }
 
-window.addEventListener('resize', () => {
-    if (window.innerWidth <= 768) {
-        document.querySelector('.mobile-barber-selector').style.display = 'block';
-        document.querySelector('.scroll-indicator').style.display = 'none';
-    } else {
-        document.querySelector('.mobile-barber-selector').style.display = 'none';
-        document.querySelector('.scroll-indicator').style.display = 'block';
-        filterByBarber('all'); // Reset to show all
-    }
-});
-
-// Change date function
-function changeDate(dateValue) {
-    const currentUrl = new URL(window.location.href);
-    if (dateValue === 'tomorrow') {
-        currentUrl.searchParams.set('date', 'tomorrow');
-    } else {
-        currentUrl.searchParams.delete('date');
-    }
-    window.location.href = currentUrl.toString();
-}
-
-// Set date selector based on URL parameter
-const urlParams = new URLSearchParams(window.location.search);
-const dateParam = urlParams.get('date');
-if (dateParam === 'tomorrow') {
-    document.getElementById('dateSelect').value = 'tomorrow';
-}
-</script>
-{% endblock %}
-
-{% block scripts %}
-{% endblock %}
+window.addEventL
