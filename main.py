@@ -1272,28 +1272,47 @@ async def get_available_times(
     service_id: int,
     vip_code: str = "",
     date_selection: str = "today",
+    admin: str = "",
     db: Session = Depends(get_db),
 ):
     from fastapi.responses import JSONResponse
+
+    # Block requests for inactive barbers (prevents booking with closed barbers)
+    barber = crud.get_barber_by_id(db, barber_id)
+    if not barber or (not barber.active and admin != "1"):
+        return JSONResponse(
+            content=[],
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
 
     # Check if VIP code is valid for this barber
     is_vip = False
     if vip_code and vip_code.strip():
         vip_code_upper = vip_code.strip().upper()
         if vip_code_upper.startswith("VIP"):
-            barber = crud.get_barber_by_id(db, barber_id)
-            if barber and barber.early_access_enabled:
+            if barber.early_access_enabled:
                 barber_name = vip_code_upper[3:]
                 if barber.name.upper() == barber_name:
                     is_vip = True
 
-    # Get available times with VIP flag and date selection
-    use_tomorrow = date_selection == "tomorrow" and is_vip
-    # Fetch schedule once here so get_available_times_for_service doesn't re-query it
-    schedule = crud.get_schedule(db)
-    times = crud.get_available_times_for_service(
-        db, barber_id, service_id, is_vip, use_tomorrow, schedule
-    )
+    # Admin mode: return all schedule slots (not just future ones)
+    # This allows admins to reschedule appointments to any time in the day
+    if admin == "1":
+        schedule = crud.get_schedule(db)
+        times = crud.get_all_day_times_for_service(
+            db, barber_id, service_id, schedule, date_selection == "tomorrow"
+        )
+    else:
+        # Get available times with VIP flag and date selection
+        use_tomorrow = date_selection == "tomorrow" and is_vip
+        schedule = crud.get_schedule(db)
+        times = crud.get_available_times_for_service(
+            db, barber_id, service_id, is_vip, use_tomorrow, schedule
+        )
     return JSONResponse(
         content=times,
         headers={

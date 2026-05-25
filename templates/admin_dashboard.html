@@ -469,20 +469,35 @@ function loadAvailableTimesForEdit() {
     
     timeSelect.innerHTML = '<option value="">Loading...</option>';
     
-    fetch(`/api/available-times/${barberId}/${serviceId}?date_selection=today&t=${Date.now()}`)
+    // admin=1 returns all day slots (not just future ones) so admin can reschedule freely
+    const dateSelection = document.getElementById('dateSelect')?.value || 'today';
+    fetch(`/api/available-times/${barberId}/${serviceId}?date_selection=${dateSelection}&admin=1&t=${Date.now()}`)
         .then(response => response.json())
         .then(times => {
             timeSelect.innerHTML = '';
+            
+            // Always include the current appointment time in the list
+            const normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
+            let hasCurrentTime = false;
+            
             times.forEach(time => {
                 const option = document.createElement('option');
                 option.value = time;
                 option.textContent = time;
                 timeSelect.appendChild(option);
+                if (time === normalizedTime) hasCurrentTime = true;
             });
             
-            // Set current time if available (normalize to HH:MM format)
-            if (window.currentEditTime) {
-                const normalizedTime = window.currentEditTime.substring(0, 5); // Get HH:MM only
+            // If current time wasn't in the available list, add it (it's the appointment's own slot)
+            if (normalizedTime && !hasCurrentTime) {
+                const option = document.createElement('option');
+                option.value = normalizedTime;
+                option.textContent = normalizedTime + ' (current)';
+                timeSelect.insertBefore(option, timeSelect.firstChild);
+            }
+            
+            // Set current time
+            if (normalizedTime) {
                 timeSelect.value = normalizedTime;
             }
         })

@@ -199,6 +199,11 @@ def create_appointment(
     if client and client.blocked:
         raise ValueError("This client is blocked and cannot make appointments")
 
+    # Check if barber is active (prevents booking with closed barbers)
+    barber_check = get_barber_by_id(db, barber_id)
+    if not barber_check or not barber_check.active:
+        raise ValueError("This barber is not available. Please select another barber.")
+
     appointment_dt = datetime.fromisoformat(appointment_time)
     from zoneinfo import ZoneInfo
 
@@ -624,6 +629,78 @@ def get_available_times_for_service(
                     current < end and service_end > start for start, end in booked
                 ):
                     available_times.append(current.strftime("%H:%M"))
+        current += timedelta(minutes=30)
+
+    return available_times
+
+
+def get_all_day_times_for_service(
+    db: Session,
+    barber_id: int,
+    service_id: int,
+    schedule=None,
+    use_tomorrow: bool = False,
+):
+    """Return all schedule time slots for the day (admin use — ignores current time).
+    Excludes slots that conflict with existing non-cancelled appointments."""
+    from zoneinfo import ZoneInfo
+
+    cet = ZoneInfo("Europe/Madrid")
+    now = datetime.now(cet).replace(tzinfo=None)
+    today = now.date()
+
+    if schedule is None:
+        schedule = get_schedule(db)
+
+    if not schedule.is_open:
+        return []
+
+    service_duration = (
+        db.query(models.Service.duration)
+        .filter(models.Service.id == service_id)
+        .scalar()
+    )
+    if not service_duration:
+        return []
+
+    target_date = today + timedelta(days=1) if use_tomorrow else today
+
+    start_time = datetime.combine(
+        target_date, datetime.min.time().replace(hour=schedule.start_hour)
+    )
+    end_time = datetime.combine(
+        target_date, datetime.min.time().replace(hour=schedule.end_hour)
+    )
+
+    # Fetch existing appointments for conflict check
+    existing_appointments = (
+        db.query(
+            models.Appointment.appointment_time,
+            models.Appointment.custom_duration,
+            models.Service.duration,
+        )
+        .join(models.Service)
+        .filter(
+            models.Appointment.barber_id == barber_id,
+            models.Appointment.appointment_time >= start_time,
+            models.Appointment.appointment_time <= end_time,
+            models.Appointment.status != "cancelled",
+        )
+        .all()
+    )
+
+    booked = [
+        (apt_time, apt_time + timedelta(minutes=custom_dur or svc_dur))
+        for apt_time, custom_dur, svc_dur in existing_appointments
+    ]
+
+    available_times = []
+    current = start_time
+    while current < end_time:
+        service_end = current + timedelta(minutes=service_duration)
+        if service_end <= end_time:
+            if not any(current < end and service_end > start for start, end in booked):
+                available_times.append(current.strftime("%H:%M"))
         current += timedelta(minutes=30)
 
     return available_times
