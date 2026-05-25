@@ -1,5 +1,4 @@
 import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
 import os
 
 def init_sentry():
@@ -20,11 +19,6 @@ def init_sentry():
         
         # Environment
         environment=os.environ.get('ENVIRONMENT', 'production'),
-        
-        # FastAPI Integration (auto-enabled)
-        integrations=[
-            FastApiIntegration(transaction_style="endpoint"),
-        ],
         
         # Performance Monitoring - capture 10% of transactions
         traces_sample_rate=0.1,
