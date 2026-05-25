@@ -395,13 +395,30 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
     document.getElementById('editDuration').value = duration;
     document.getElementById('editBarber').value = barberId;
     
-    // Store current time and fetch service_id
+    // Store current time
     window.currentEditTime = time;
+    
+    // Immediately populate time dropdown with all slots (don't wait for API)
+    const timeSelect = document.getElementById('editTime');
+    timeSelect.innerHTML = '';
+    for (let h = 11; h < 19; h++) {
+        ['00', '30'].forEach(m => {
+            const t = String(h).padStart(2,'0') + ':' + m;
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            timeSelect.appendChild(opt);
+        });
+    }
+    // Select current time
+    const normalizedTime = time ? time.substring(0, 5) : '';
+    if (normalizedTime) timeSelect.value = normalizedTime;
+    
+    // Fetch service_id and phone (non-blocking, doesn't affect time dropdown)
     fetch(`/api/appointment-details/${id}`)
         .then(response => response.json())
         .then(data => {
             document.getElementById('editServiceId').value = data.service_id;
-            loadAvailableTimesForEdit();
             
             // Get phone info
             const phoneGroup = document.getElementById('editPhoneGroup');
@@ -461,68 +478,22 @@ function submitEditAppointment(event) {
 }
 
 function loadAvailableTimesForEdit() {
-    const barberId = document.getElementById('editBarber').value;
-    const serviceId = document.getElementById('editServiceId').value;
+    // Simple: always show all 30-min slots from 11:00 to 18:30
+    // Admin can pick any time — conflict check happens server-side on save
     const timeSelect = document.getElementById('editTime');
     const normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
     
-    // Generate all possible 30-min slots as fallback
-    function generateAllSlots() {
-        const slots = [];
-        for (let h = 11; h < 19; h++) {
-            slots.push(String(h).padStart(2,'0') + ':00');
-            slots.push(String(h).padStart(2,'0') + ':30');
-        }
-        return slots;
-    }
-    
-    function populateSelect(times) {
-        timeSelect.innerHTML = '';
-        let hasCurrentTime = false;
-        
-        times.forEach(time => {
-            const option = document.createElement('option');
-            option.value = time;
-            option.textContent = time;
-            timeSelect.appendChild(option);
-            if (time === normalizedTime) hasCurrentTime = true;
+    timeSelect.innerHTML = '';
+    for (let h = 11; h < 19; h++) {
+        ['00', '30'].forEach(m => {
+            const t = String(h).padStart(2,'0') + ':' + m;
+            const opt = document.createElement('option');
+            opt.value = t;
+            opt.textContent = t;
+            timeSelect.appendChild(opt);
         });
-        
-        // Always include current time
-        if (normalizedTime && !hasCurrentTime) {
-            const option = document.createElement('option');
-            option.value = normalizedTime;
-            option.textContent = normalizedTime + ' (current)';
-            timeSelect.insertBefore(option, timeSelect.firstChild);
-        }
-        
-        if (normalizedTime) timeSelect.value = normalizedTime;
     }
-    
-    if (!barberId || !serviceId) {
-        // No service yet — show all slots so admin can still pick a time
-        populateSelect(generateAllSlots());
-        return;
-    }
-    
-    timeSelect.innerHTML = '<option value="">Loading...</option>';
-    
-    const dateSelection = document.getElementById('dateSelect')?.value || 'today';
-    fetch(`/api/available-times/${barberId}/${serviceId}?date_selection=${dateSelection}&admin=1&t=${Date.now()}`)
-        .then(response => response.json())
-        .then(times => {
-            if (!times || !times.length) {
-                // API returned empty — use all slots as fallback for admin
-                populateSelect(generateAllSlots());
-            } else {
-                populateSelect(times);
-            }
-        })
-        .catch(error => {
-            console.error('Error loading times:', error);
-            // On error, show all slots so admin isn't blocked
-            populateSelect(generateAllSlots());
-        });
+    if (normalizedTime) timeSelect.value = normalizedTime;
 }
 
 function completeAppointment() {
