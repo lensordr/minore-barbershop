@@ -212,8 +212,23 @@
             </div>
             <div class="form-group">
                 <label for="editTime">Time:</label>
-                <select id="editTime" name="time" required style="width: 100%; padding: 0.75rem; border: 1px solid #444; border-radius: 4px; background: #2a2a2a; color: #fbcc93; font-size: 1rem;">
-                    <option value="">Loading...</option>
+                <select id="editTime" name="time" required style="width: 100%; padding: 0.75rem; border: 1px solid #444; border-radius: 4px; background: #1d1a1c; color: #fbcc93; font-size: 1rem; -webkit-appearance: menulist; appearance: menulist;">
+                    <option value="11:00">11:00</option>
+                    <option value="11:30">11:30</option>
+                    <option value="12:00">12:00</option>
+                    <option value="12:30">12:30</option>
+                    <option value="13:00">13:00</option>
+                    <option value="13:30">13:30</option>
+                    <option value="14:00">14:00</option>
+                    <option value="14:30">14:30</option>
+                    <option value="15:00">15:00</option>
+                    <option value="15:30">15:30</option>
+                    <option value="16:00">16:00</option>
+                    <option value="16:30">16:30</option>
+                    <option value="17:00">17:00</option>
+                    <option value="17:30">17:30</option>
+                    <option value="18:00">18:00</option>
+                    <option value="18:30">18:30</option>
                 </select>
             </div>
             <input type="hidden" id="editServiceId" name="service_id">
@@ -395,34 +410,20 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
     document.getElementById('editDuration').value = duration;
     document.getElementById('editBarber').value = barberId;
     
-    // Store current time
+    // Set current time on the pre-populated select
     window.currentEditTime = time;
-    
-    // Immediately populate time dropdown with all slots (don't wait for API)
-    const timeSelect = document.getElementById('editTime');
-    timeSelect.innerHTML = '';
-    for (let h = 11; h < 19; h++) {
-        ['00', '30'].forEach(m => {
-            const t = String(h).padStart(2,'0') + ':' + m;
-            const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
-            timeSelect.appendChild(opt);
-        });
+    var normalizedTime = time ? time.substring(0, 5) : '';
+    if (normalizedTime) {
+        document.getElementById('editTime').value = normalizedTime;
     }
-    // Select current time
-    const normalizedTime = time ? time.substring(0, 5) : '';
-    if (normalizedTime) timeSelect.value = normalizedTime;
     
-    // Fetch service_id and phone (non-blocking, doesn't affect time dropdown)
-    fetch(`/api/appointment-details/${id}`)
-        .then(response => response.json())
-        .then(data => {
+    // Fetch phone info (non-blocking)
+    fetch('/api/appointment-details/' + id)
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
             document.getElementById('editServiceId').value = data.service_id;
-            
-            // Get phone info
-            const phoneGroup = document.getElementById('editPhoneGroup');
-            const phoneSpan = document.getElementById('editClientPhone');
+            var phoneGroup = document.getElementById('editPhoneGroup');
+            var phoneSpan = document.getElementById('editClientPhone');
             if (data.phone && data.phone.trim()) {
                 phoneSpan.textContent = data.phone;
                 phoneGroup.style.display = 'block';
@@ -430,14 +431,13 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
                 phoneGroup.style.display = 'none';
             }
         })
-        .catch(error => {
-            console.error('Error loading appointment details:', error);
+        .catch(function() {
             document.getElementById('editPhoneGroup').style.display = 'none';
         });
     
     // Show/hide action buttons based on status
-    const actionButtons = document.getElementById('appointmentActions');
-    const completedButtons = document.getElementById('completedActions');
+    var actionButtons = document.getElementById('appointmentActions');
+    var completedButtons = document.getElementById('completedActions');
     if (status === 'scheduled') {
         actionButtons.style.display = 'flex';
         completedButtons.style.display = 'none';
@@ -454,7 +454,6 @@ function editAppointment(id, clientName, serviceName, price, duration, time, sta
 
 function closeEditAppointment() {
     document.getElementById('editAppointmentModal').style.display = 'none';
-    document.getElementById('editAppointmentForm').reset();
 }
 
 function submitEditAppointment(event) {
@@ -478,22 +477,11 @@ function submitEditAppointment(event) {
 }
 
 function loadAvailableTimesForEdit() {
-    // Simple: always show all 30-min slots from 11:00 to 18:30
-    // Admin can pick any time — conflict check happens server-side on save
-    const timeSelect = document.getElementById('editTime');
-    const normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
-    
-    timeSelect.innerHTML = '';
-    for (let h = 11; h < 19; h++) {
-        ['00', '30'].forEach(m => {
-            const t = String(h).padStart(2,'0') + ':' + m;
-            const opt = document.createElement('option');
-            opt.value = t;
-            opt.textContent = t;
-            timeSelect.appendChild(opt);
-        });
+    // Options are hardcoded in HTML — just reset selection to current time
+    var normalizedTime = window.currentEditTime ? window.currentEditTime.substring(0, 5) : null;
+    if (normalizedTime) {
+        document.getElementById('editTime').value = normalizedTime;
     }
-    if (normalizedTime) timeSelect.value = normalizedTime;
 }
 
 function completeAppointment() {
@@ -584,7 +572,9 @@ function filterByBarber(barberId) {
         
         headers.forEach((h, i) => {
             const cells = document.querySelectorAll(`.grid-row .appointment-cell:nth-child(${i + 2})`);
-            if (h.textContent.includes(document.querySelector(`option[value="${barberId}"]`).textContent.split(' (')[0])) {
+            const optEl = document.querySelector(`option[value="${barberId}"]`);
+            const barberText = optEl ? optEl.textContent.split(' (')[0] : '';
+            if (barberText && h.textContent.includes(barberText)) {
                 h.style.display = 'block';
                 cells.forEach(c => c.style.display = 'block');
             } else {
