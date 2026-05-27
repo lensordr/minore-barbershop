@@ -17,12 +17,12 @@ if DATABASE_URL.startswith('postgresql://'):
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    pool_recycle=300,  # Reduced from 1800
-    pool_timeout=10,   # Reduced from 20
-    pool_size=10,      # Increased pool size
-    max_overflow=5,    # Increased from 0
+    pool_recycle=300,  # Recycle connections every 5 minutes
+    pool_timeout=20,   # Wait up to 20s for a connection
+    pool_size=15,      # Larger base pool for concurrent requests
+    max_overflow=10,   # Allow up to 25 total connections under load
     connect_args={
-        "connect_timeout": 5,  # Reduced from 10
+        "connect_timeout": 10,
         "application_name": "minore_barbershop"
     }
 )
