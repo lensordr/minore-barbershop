@@ -399,7 +399,7 @@ function clearTime() {
 function refreshTimes() {
   const barberId  = document.getElementById('barber_id').value;
   const serviceId = document.getElementById('service_id').value;
-  if (!barberId || !serviceId) return;
+  if (!barberId || !serviceId || isNaN(parseInt(serviceId)) || parseInt(serviceId) <= 0) return;
 
   const vipCode = document.getElementById('vip_code').value.trim();
   const dateEl  = document.getElementById('appointment_date');

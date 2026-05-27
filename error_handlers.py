@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 import traceback
+import re
 
 try:
     import sentry_sdk
@@ -91,7 +92,24 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     Handle validation errors (bad request data)
     """
     
-    # Log validation errors to Sentry with lower severity
+    # Suppress Sentry reporting for known validation patterns:
+    # If the validation error is for service_id on the available-times endpoint,
+    # return an empty list with 200 status without reporting to Sentry.
+    # This reduces noise from known validation errors that are now handled gracefully.
+    available_times_pattern = re.compile(r"^/api/available-times/[^/]+/[^/]+$")
+    if available_times_pattern.match(request.url.path):
+        # Check if any of the validation errors involve service_id
+        errors = exc.errors()
+        is_service_id_error = any(
+            "service_id" in (err.get("loc", ()) or ())
+            or "service_id" in str(err.get("loc", ""))
+            for err in errors
+        )
+        if is_service_id_error:
+            print(f"ℹ️ Suppressed known validation error for service_id on available-times: {errors}")
+            return JSONResponse(content=[], status_code=200)
+    
+    # Log validation errors to Sentry with lower severity (for non-suppressed errors)
     if SENTRY_AVAILABLE:
         sentry_sdk.capture_message(
             f"Validation error: {exc.errors()}",

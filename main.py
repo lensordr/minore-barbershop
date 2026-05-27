@@ -727,7 +727,7 @@ async def admin_dashboard(
     # Create grid data with appointment spans
     from grid_helper import create_appointment_grid
 
-    grid_data = create_appointment_grid(db, appointments, schedule, location)
+    grid_data = create_appointment_grid(db, appointments, schedule, location, barbers=barbers)
 
     location_name = "Mallorca" if location == 1 else "Concell"
 
@@ -1283,13 +1283,25 @@ async def check_client(phone: str, db: Session = Depends(get_db)):
 @app.get("/api/available-times/{barber_id}/{service_id}")
 async def get_available_times(
     barber_id: int,
-    service_id: int,
+    service_id: str,
     vip_code: str = "",
     date_selection: str = "today",
     admin: str = "",
     db: Session = Depends(get_db),
 ):
     from fastapi.responses import JSONResponse
+
+    # Validate service_id: must be a valid positive integer
+    # If invalid (non-numeric, "undefined", "null", "0", negative), return empty list immediately
+    try:
+        service_id_int = int(service_id)
+        if service_id_int <= 0:
+            return JSONResponse(content=[], status_code=200)
+    except (ValueError, TypeError):
+        return JSONResponse(content=[], status_code=200)
+
+    # Use the validated integer service_id from here on
+    service_id = service_id_int
 
     # Block requests for inactive barbers (prevents booking with closed barbers)
     barber = crud.get_barber_by_id(db, barber_id)

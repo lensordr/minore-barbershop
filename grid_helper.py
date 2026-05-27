@@ -1,11 +1,19 @@
 from datetime import datetime, timedelta
 
-def create_appointment_grid(db, appointments, schedule, location_id=None):
+def create_appointment_grid(db, appointments, schedule, location_id=None, barbers=None):
     """Optimized grid creation - minimal database calls.
     
     Prioritizes online appointments (is_online >= 1) over manual ones (is_online == 0)
     when multiple non-cancelled appointments occupy the same time slot for the same barber.
     This prevents manual appointments from silently hiding online bookings in the grid.
+    
+    Args:
+        db: Database session.
+        appointments: List of appointment objects.
+        schedule: Schedule object with start_hour and end_hour.
+        location_id: Optional location ID for filtering barbers.
+        barbers: Optional pre-fetched list of barbers. If provided, skips the
+                 internal database query for barbers.
     """
     import crud
     
@@ -15,8 +23,10 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
         hours.append(f"{h:02d}:00")
         hours.append(f"{h:02d}:30")
     
-    # Get barbers with single query (already optimized)
-    if location_id:
+    # Use pre-fetched barbers if provided, otherwise query the database
+    if barbers is not None:
+        all_barbers = barbers
+    elif location_id:
         all_barbers = crud.get_barbers_with_revenue_by_location(db, location_id)
     else:
         all_barbers = crud.get_barbers(db)
