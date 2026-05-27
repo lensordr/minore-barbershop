@@ -255,6 +255,9 @@ def create_appointment(
     appointment_end = appointment_dt + timedelta(minutes=service_duration)
 
     # Check for time conflicts - only query same day to avoid full table scan
+    # NOTE: We intentionally do NOT filter by location_id here because a barber
+    # physically cannot be in two places at once. This prevents double-booking
+    # across locations for the same barber.
     day_start = datetime.combine(appointment_date, datetime.min.time())
     day_end = day_start + timedelta(days=1)
     existing_appointments = (
@@ -266,7 +269,6 @@ def create_appointment(
         .join(models.Service)
         .filter(
             models.Appointment.barber_id == barber_id,
-            models.Appointment.location_id == location_id,
             models.Appointment.status != "cancelled",
             models.Appointment.appointment_time >= day_start,
             models.Appointment.appointment_time < day_end,
@@ -362,6 +364,9 @@ def create_appointment_lightning_fast(
     appointment_end = appointment_dt + timedelta(minutes=duration)
 
     # Single query: fetch all same-day appointments for this barber (non-cancelled)
+    # NOTE: We intentionally do NOT filter by location_id here because a barber
+    # physically cannot be in two places at once. This prevents double-booking
+    # across locations for the same barber.
     day_start = datetime.combine(appointment_dt.date(), datetime.min.time())
     day_end = day_start + timedelta(days=1)
 

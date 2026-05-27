@@ -1,7 +1,12 @@
 from datetime import datetime, timedelta
 
 def create_appointment_grid(db, appointments, schedule, location_id=None):
-    """Optimized grid creation - minimal database calls"""
+    """Optimized grid creation - minimal database calls.
+    
+    Prioritizes online appointments (is_online >= 1) over manual ones (is_online == 0)
+    when multiple non-cancelled appointments occupy the same time slot for the same barber.
+    This prevents manual appointments from silently hiding online bookings in the grid.
+    """
     import crud
     
     # Generate time slots once
@@ -23,7 +28,8 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
     # Create hour index lookup for faster processing
     hour_index = {hour: idx for idx, hour in enumerate(hours)}
     
-    # Fill grid with appointments (optimized loop)
+    # Fill grid with appointments — prioritize online bookings over manual ones
+    # when there's a conflict at the same start time for the same barber.
     for appointment in appointments:
         if appointment.status == "cancelled":
             continue
@@ -36,6 +42,26 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
             
         duration = appointment.custom_duration or appointment.service.duration
         slots_needed = (duration + 29) // 30
+        
+        current_slot = grid[barber_id][start_time]
+        
+        # If slot already has an appointment, keep the online one (higher priority)
+        if current_slot["type"] == "appointment":
+            existing_apt = current_slot["appointment"]
+            existing_is_online = getattr(existing_apt, "is_online", 0) or 0
+            new_is_online = getattr(appointment, "is_online", 0) or 0
+            
+            # Online appointments (is_online >= 1) take priority over manual (is_online == 0)
+            if existing_is_online >= 1 and new_is_online == 0:
+                # Existing is online, new is manual — keep existing, skip new
+                continue
+            elif existing_is_online == 0 and new_is_online >= 1:
+                # Existing is manual, new is online — replace with online appointment
+                pass  # Fall through to overwrite
+            else:
+                # Both same type — keep the one with lower ID (created first)
+                if existing_apt.id < appointment.id:
+                    continue
         
         # Mark starting slot
         grid[barber_id][start_time] = {
