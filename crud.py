@@ -258,6 +258,7 @@ def create_appointment(
     # NOTE: We intentionally do NOT filter by location_id here because a barber
     # physically cannot be in two places at once. This prevents double-booking
     # across locations for the same barber.
+    # USE FOR UPDATE to prevent race conditions — locks matching rows until commit
     day_start = datetime.combine(appointment_date, datetime.min.time())
     day_end = day_start + timedelta(days=1)
     existing_appointments = (
@@ -273,6 +274,7 @@ def create_appointment(
             models.Appointment.appointment_time >= day_start,
             models.Appointment.appointment_time < day_end,
         )
+        .with_for_update()
         .all()
     )
 
@@ -367,6 +369,7 @@ def create_appointment_lightning_fast(
     # NOTE: We intentionally do NOT filter by location_id here because a barber
     # physically cannot be in two places at once. This prevents double-booking
     # across locations for the same barber.
+    # USE FOR UPDATE to prevent race conditions — locks matching rows until commit
     day_start = datetime.combine(appointment_dt.date(), datetime.min.time())
     day_end = day_start + timedelta(days=1)
 
@@ -384,6 +387,7 @@ def create_appointment_lightning_fast(
             models.Appointment.appointment_time >= day_start,
             models.Appointment.appointment_time < day_end,
         )
+        .with_for_update()
         .all()
     )
 

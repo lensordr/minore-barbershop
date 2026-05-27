@@ -50,7 +50,7 @@ MINORE BARBER Team
         msg.attach(MIMEText(body, 'plain'))
         
         # Brevo SMTP configuration
-        server = smtplib.SMTP('smtp-relay.brevo.com', 587)
+        server = smtplib.SMTP('smtp-relay.brevo.com', 587, timeout=10)
         server.starttls()
         server.login(os.getenv('BREVO_SMTP_USER'), os.getenv('BREVO_SMTP_PASSWORD'))
         server.send_message(msg)
@@ -88,7 +88,7 @@ MINORE BARBER Team
         msg.attach(MIMEText(body, 'plain'))
         
         # Brevo SMTP configuration
-        server = smtplib.SMTP('smtp-relay.brevo.com', 587)
+        server = smtplib.SMTP('smtp-relay.brevo.com', 587, timeout=10)
         server.starttls()
         server.login(os.getenv('BREVO_SMTP_USER'), os.getenv('BREVO_SMTP_PASSWORD'))
         server.send_message(msg)

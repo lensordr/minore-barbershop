@@ -5,8 +5,10 @@ import os
 # Use Render PostgreSQL
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if not DATABASE_URL:
-    # Render PostgreSQL URL
-    DATABASE_URL = "postgresql://minore_barbershop_production_user:wpxw9iKAdGi4BFyXabqHYl9hSxkdwEYB@dpg-d4jijreuk2gs73bm33vg-a.frankfurt-postgres.render.com/minore_barbershop_production"
+    raise RuntimeError(
+        "DATABASE_URL environment variable is not set. "
+        "Please configure it with your PostgreSQL connection string."
+    )
 
 print(f"Connecting to PostgreSQL...")
 

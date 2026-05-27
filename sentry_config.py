@@ -4,11 +4,7 @@ import os
 def init_sentry():
     """Initialize Sentry error monitoring with FastAPI integration"""
     
-    # Use environment variable or fallback to provided DSN
-    sentry_dsn = os.environ.get(
-        'SENTRY_DSN',
-        'https://9e0c59962edd3afdd136b8cb7f5fafad@o4510975167168512.ingest.de.sentry.io/4510975169724496'
-    )
+    sentry_dsn = os.environ.get('SENTRY_DSN', '')
     
     if not sentry_dsn:
         print("⚠️  SENTRY_DSN not configured - error monitoring disabled")

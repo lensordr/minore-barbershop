@@ -932,7 +932,11 @@ async def delete_service(
 
 
 @app.post("/admin/checkout/{appointment_id}")
-async def checkout_appointment(appointment_id: int, db: Session = Depends(get_db)):
+async def checkout_appointment(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
     result = crud.checkout_appointment_ultra_fast(db, appointment_id)
     if result:
         return {"success": True}
@@ -944,13 +948,21 @@ async def checkout_appointment(appointment_id: int, db: Session = Depends(get_db
 
 
 @app.post("/admin/cancel/{appointment_id}")
-async def cancel_appointment(appointment_id: int, db: Session = Depends(get_db)):
+async def cancel_appointment(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
     crud.cancel_appointment(db, appointment_id)
     return {"success": True}
 
 
 @app.post("/admin/reopen/{appointment_id}")
-async def reopen_appointment(appointment_id: int, db: Session = Depends(get_db)):
+async def reopen_appointment(
+    appointment_id: int,
+    db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
+):
     crud.reopen_appointment(db, appointment_id)
     return {"success": True}
 
@@ -964,6 +976,7 @@ async def edit_appointment(
     price: float = Form(None),
     duration: int = Form(None),
     db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
 ):
     try:
         appointment = (
@@ -1084,6 +1097,7 @@ async def add_manual_appointment(
     price: float = Form(...),
     location_id: int = Form(1),
     db: Session = Depends(get_db),
+    auth: bool = Depends(check_admin_auth),
 ):
     try:
         phone = client_phone.strip() if client_phone else ""
