@@ -872,6 +872,19 @@ async def toggle_barber(
     return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
 
 
+@app.post("/admin/toggle-barber-tomorrow/{barber_id}")
+async def toggle_barber_tomorrow(
+    barber_id: int,
+    request: Request,
+    location: int = Form(None),
+    db: Session = Depends(get_db),
+):
+    if location is None:
+        location = int(os.environ.get("DEFAULT_LOCATION", 1))
+    crud.toggle_barber_tomorrow(db, barber_id)
+    return RedirectResponse(url=f"/admin/staff?location={location}", status_code=303)
+
+
 @app.post("/admin/edit-barber/{barber_id}")
 async def edit_barber(
     barber_id: int,
@@ -1280,6 +1293,17 @@ async def get_available_times(
     # Block requests for inactive barbers (prevents booking with closed barbers)
     barber = crud.get_barber_by_id(db, barber_id)
     if not barber or (not barber.active and admin != "1"):
+        return JSONResponse(
+            content=[],
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
+    # Block tomorrow requests if barber has closed tomorrow
+    if date_selection == "tomorrow" and barber.closed_tomorrow and admin != "1":
         return JSONResponse(
             content=[],
             headers={

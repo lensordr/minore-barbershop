@@ -106,6 +106,12 @@
                         <input type="hidden" name="location" value="{{ location_id }}">
                         <button type="submit" class="btn-toggle">{% if barber.active %}Close{% else %}Open{% endif %}</button>
                     </form>
+                    <form method="POST" action="/admin/toggle-barber-tomorrow/{{ barber.id }}" style="display: inline;">
+                        <input type="hidden" name="location" value="{{ location_id }}">
+                        <button type="submit" class="btn-toggle-tomorrow" style="{% if barber.closed_tomorrow %}background: #dc3545; color: white;{% else %}background: #ffc107; color: #1d1a1c;{% endif %}">
+                            {% if barber.closed_tomorrow %}Open Tomorrow{% else %}Close Tomorrow{% endif %}
+                        </button>
+                    </form>
                     {% if barber.name != 'Luca' %}
                     <form method="POST" action="/admin/delete-barber/{{ barber.id }}" style="display: inline;">
                         <input type="hidden" name="location" value="{{ location_id }}">
@@ -199,6 +205,20 @@ input[type="checkbox"]:checked + span + span {
 .btn:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* Close Tomorrow Button */
+.btn-toggle-tomorrow {
+    padding: 0.4rem 0.75rem;
+    border: none;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+}
+.btn-toggle-tomorrow:hover {
+    opacity: 0.85;
 }
 
 /* Mobile Optimization */

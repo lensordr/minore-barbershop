@@ -25,6 +25,7 @@ class Barber(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, index=True)
     active = Column(Integer, default=1)  # 1=active, 0=closed
+    closed_tomorrow = Column(Integer, default=0)  # 1=closed for tomorrow, 0=open
     location_id = Column(Integer, default=1)  # 1=mallorca, 2=concell
     early_access_enabled = Column(Integer, default=0)  # 1=enabled, 0=disabled
     early_access_price_add = Column(Float, default=0.0)  # Extra price for early access

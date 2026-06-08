@@ -211,6 +211,13 @@ def create_appointment(
     today = now.date()
     appointment_date = appointment_dt.date()
 
+    # Check if barber has closed tomorrow and appointment is for tomorrow
+    tomorrow = today + timedelta(days=1)
+    if appointment_date == tomorrow and barber_check.closed_tomorrow:
+        raise ValueError(
+            "This barber is not available tomorrow. Please select another barber or date."
+        )
+
     # Calculate next available slot for today
     if now.minute < 30:
         next_hour = now.hour
@@ -548,6 +555,11 @@ def get_available_times_for_service(
 
     # VIP users booking for tomorrow (24h advance)
     if is_vip and use_tomorrow:
+        # Check if barber has closed tomorrow
+        barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+        if barber and barber.closed_tomorrow:
+            return []
+
         tomorrow = today + timedelta(days=1)
         if tomorrow.weekday() == 6:
             return []
@@ -1029,6 +1041,52 @@ def toggle_barber_status(db: Session, barber_id: int):
         barber.active = 1 - barber.active  # Toggle between 0 and 1
         db.commit()
         db.refresh(barber)
+    return barber
+
+
+def toggle_barber_tomorrow(db: Session, barber_id: int):
+    """Toggle barber's closed_tomorrow status and cancel VIP appointments for tomorrow if closing."""
+    barber = db.query(models.Barber).filter(models.Barber.id == barber_id).first()
+    if not barber:
+        return None
+
+    barber.closed_tomorrow = 1 - barber.closed_tomorrow  # Toggle between 0 and 1
+
+    # If closing tomorrow, cancel all scheduled online appointments for tomorrow
+    if barber.closed_tomorrow == 1:
+        from zoneinfo import ZoneInfo
+
+        cet = ZoneInfo("Europe/Madrid")
+        now = datetime.now(cet).replace(tzinfo=None)
+        tomorrow = now.date() + timedelta(days=1)
+        tomorrow_start = datetime.combine(tomorrow, datetime.min.time())
+        tomorrow_end = tomorrow_start + timedelta(days=1)
+
+        # Cancel all online (VIP) appointments for this barber tomorrow
+        tomorrow_appointments = (
+            db.query(models.Appointment)
+            .filter(
+                models.Appointment.barber_id == barber_id,
+                models.Appointment.appointment_time >= tomorrow_start,
+                models.Appointment.appointment_time < tomorrow_end,
+                models.Appointment.status == "scheduled",
+                models.Appointment.is_online.in_([1, 2]),  # online bookings only
+            )
+            .all()
+        )
+
+        cancelled_count = 0
+        for apt in tomorrow_appointments:
+            apt.status = "cancelled"
+            cancelled_count += 1
+
+        if cancelled_count > 0:
+            print(
+                f"🚫 Cancelled {cancelled_count} online appointment(s) for {barber.name} tomorrow ({tomorrow})"
+            )
+
+    db.commit()
+    db.refresh(barber)
     return barber
 
 
