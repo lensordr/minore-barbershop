@@ -1313,6 +1313,18 @@ async def get_available_times(
             },
         )
 
+    # Check if schedule is closed — return empty so cached pages show no slots
+    schedule = crud.get_schedule(db)
+    if not schedule.is_open and admin != "1":
+        return JSONResponse(
+            content=[],
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+
     # Check if VIP code is valid for this barber
     is_vip = False
     if vip_code and vip_code.strip():
@@ -1326,14 +1338,12 @@ async def get_available_times(
     # Admin mode: return all schedule slots (not just future ones)
     # This allows admins to reschedule appointments to any time in the day
     if admin == "1":
-        schedule = crud.get_schedule(db)
         times = crud.get_all_day_times_for_service(
             db, barber_id, service_id, schedule, date_selection == "tomorrow"
         )
     else:
         # Get available times with VIP flag and date selection
         use_tomorrow = date_selection == "tomorrow" and is_vip
-        schedule = crud.get_schedule(db)
         times = crud.get_available_times_for_service(
             db, barber_id, service_id, is_vip, use_tomorrow, schedule
         )

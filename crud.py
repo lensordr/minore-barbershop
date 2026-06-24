@@ -204,6 +204,11 @@ def create_appointment(
     if not barber_check or not barber_check.active:
         raise ValueError("This barber is not available. Please select another barber.")
 
+    # Check if schedule is open — blocks cached pages and direct API calls
+    schedule = get_schedule(db)
+    if not schedule.is_open:
+        raise ValueError("We are currently closed. Please try again later.")
+
     appointment_dt = datetime.fromisoformat(appointment_time)
     from zoneinfo import ZoneInfo
 
