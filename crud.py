@@ -571,6 +571,7 @@ def get_available_times_for_service(
         start_time = datetime.combine(
             tomorrow, datetime.min.time().replace(hour=schedule.start_hour)
         )
+        # end_hour = closing time; appointments must FINISH by this time
         end_time = datetime.combine(
             tomorrow, datetime.min.time().replace(hour=schedule.end_hour)
         )
@@ -588,6 +589,7 @@ def get_available_times_for_service(
         start_time = datetime.combine(
             today, datetime.min.time().replace(hour=schedule.start_hour)
         )
+        # end_hour = closing time; appointments must FINISH by this time
         end_time = datetime.combine(
             today, datetime.min.time().replace(hour=schedule.end_hour)
         )
@@ -686,7 +688,10 @@ def get_all_day_times_for_service(
     start_time = datetime.combine(
         target_date, datetime.min.time().replace(hour=start_hour)
     )
-    end_time = datetime.combine(target_date, datetime.min.time().replace(hour=end_hour))
+    # end_hour = closing time; appointments must FINISH by this time
+    end_time = datetime.combine(
+        target_date, datetime.min.time().replace(hour=end_hour)
+    )
 
     # Fetch existing appointments for conflict check
     existing_appointments = (

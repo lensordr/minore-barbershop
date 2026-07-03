@@ -5,10 +5,33 @@ def create_appointment_grid(db, appointments, schedule, location_id=None):
     import crud
     
     # Generate time slots once
+    # end_hour = closing time; last slot shown is (end_hour-1):30
+    # e.g. end_hour=19 → grid shows 11:00..18:30 (a 30-min service at 18:30 finishes at 19:00)
     hours = []
     for h in range(schedule.start_hour, schedule.end_hour):
         hours.append(f"{h:02d}:00")
         hours.append(f"{h:02d}:30")
+    
+    # Extend the grid to cover appointments that fall outside current schedule
+    # (e.g. schedule was changed after bookings were made)
+    appointment_max_hour = schedule.end_hour
+    for appointment in appointments:
+        if appointment.status == "cancelled":
+            continue
+        apt_hour = appointment.appointment_time.hour
+        duration = appointment.custom_duration or appointment.service.duration
+        end_hour_needed = appointment.appointment_time.hour + ((appointment.appointment_time.minute + duration + 29) // 60)
+        if end_hour_needed > appointment_max_hour:
+            appointment_max_hour = end_hour_needed
+    
+    # Add extra slots if appointments exist beyond current schedule
+    for h in range(schedule.end_hour, appointment_max_hour):
+        slot_00 = f"{h:02d}:00"
+        slot_30 = f"{h:02d}:30"
+        if slot_00 not in hours:
+            hours.append(slot_00)
+        if slot_30 not in hours:
+            hours.append(slot_30)
     
     # Get barbers with single query (already optimized)
     if location_id:
