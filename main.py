@@ -396,7 +396,11 @@ async def client_cancel_appointment(
 
     last_booking_time = time.time()
     print(
-        f"Client cancelled appointment! Updated last_booking_time to {last_booking_time}"
+        f"🚫 CLIENT DASHBOARD CANCEL: appointment_id={appointment_id}, "
+        f"client={client.name} (phone={client.phone}), "
+        f"barber_id={appointment.barber_id}, "
+        f"time={appointment.appointment_time}, "
+        f"service_id={appointment.service_id}"
     )
 
     return {"success": True, "message": "Appointment cancelled successfully"}
@@ -1399,7 +1403,10 @@ async def confirm_cancel_appointment(
 
         last_booking_time = time.time()
         print(
-            f"Appointment cancelled! Updated last_booking_time to {last_booking_time}"
+            f"🚫 EMAIL LINK CANCEL: appointment_id={appointment.id}, "
+            f"client={appointment.client_name} (phone={appointment.phone}, email={appointment.email}), "
+            f"barber_id={appointment.barber_id}, "
+            f"time={appointment.appointment_time}"
         )
 
         # Send cancellation email async
